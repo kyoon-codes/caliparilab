@@ -8,13 +8,13 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 plt.rcParams['figure.dpi'] = 500
 matplotlib.rcParams['savefig.pad_inches'] = 0.2
 
-home_dir = '/Volumes/SAMSUNG USB/Med Associates'
-mice = ['4030']
+home_dir = '/Volumes/Kristine/EtOH_SA_Pilot'
+mice = ['M3']
 #,'4032','4033','4034','4035','4036','4037','4038','4039','4041'
 
 Columns=['Mouse', 'Date', 'Event', 'Timestamp']
-events=['HouseLight', 'Lick', 'Reinforcer'] #'LeverPress', 
-arrays=['W:', 'Y:', 'Z:'] #'X:',
+events=['ActiveLever', 'Cue','LeverPress', 'Lick'] 
+arrays=[ 'J:', 'P:', 'N:', 'O:']
 
 def read_med(file, finfo, var_cols, col_n='C:'):
     """ Function to read-write MED raw data to csv
@@ -73,37 +73,40 @@ for mouse in mice:
         date=f[:10]
          
         for event,col_n in zip(events, arrays):
-            Timestamps=read_med(os.path.join(directory, f),[f[-8:-4], f[:10]], var_cols=5,col_n=col_n) 
+            Timestamps=read_med(os.path.join(directory, f),[f[-6:-4], f[:10]], var_cols=5,col_n=col_n) 
             if len(Timestamps) == 0:
                 Timestamps.at[0,'vC']=0
             elif len(Timestamps)!=0:
-                if event == 'HouseLight':
-                    hl_data = Timestamps['vC'].to_list()
+                if event == 'Cue':
+                    cue_data = Timestamps['vC'].to_list()
                     # hl_data = Timestamps.to_numpy()
                     # hl_data = np.concatenate((hl_data), axis=None)
                     continue
-                elif event == 'Lick':
-                    lick_data = Timestamps['vC'].to_list()
+                elif event == 'ActiveLever':
+                    press_data = Timestamps['vC'].to_list()
                     # lick_data = Timestamps.to_numpy()
                     # lick_data = np.concatenate((lick_data), axis=None)
                     continue
-                elif event == 'Reinforcer':
-                    rein_data = Timestamps['vC'].to_list()
+                elif event == 'Lick':
+                    lick_data = Timestamps['vC'].to_list()
                     # rein_data = Timestamps.to_numpy()
                     # rein_data = np.concatenate((rein_data), axis=None)
                     continue
 
-        data_np = [[float(i) for i in hl_data],
-                   [float(i) for i in rein_data],
-                   [float(i) for i in lick_data]]
-        colors1 = ['gold','m','royalblue']
-        lineoffsets1 = [3,0,-3]
-        linelengths1 = [3,3,3]
-        max_value = max([lastelement[-1] for lastelement in data_np])
+        data_np = [#[float(i) for i in cue_data],
+                   [float(i) for i in lick_data],
+                   [float(i) for i in press_data]
+                   ]
+        colors1 = ['gold','royalblue']
+        lineoffsets1 = [-2,2]
+        linelengths1 = [3, 3]
+        max_value = 200
+        #max([lastelement[-1] for lastelement in data_np])
         plt.setp(axs, 
                  xticks=np.arange(0, max_value + 100.0, 300), 
                  yticks=lineoffsets1, 
-                 yticklabels= ['Cue','LeverPresses','Licks'])
+                 yticklabels= [#'Cue',
+                               'Licks','LeverPress'])
         axs[i].set_xlabel('Time (s)')
         axs[i].set_title(f'{date}')
         axs[i].eventplot(data_np, colors=colors1, lineoffsets=lineoffsets1,

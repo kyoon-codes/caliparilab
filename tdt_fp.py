@@ -7,7 +7,8 @@ import sys
 import tdt
 import matplotlib
 
-sys.path.append('/Volumes/SAMSUNG USB/TDT Fiber Photometry')
+
+sys.path.append('/Volumes/Kristine/D2_Ethanol_FiPho/4832')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 # in data:  epocs: the TTL inputs (Po1, Po4, Po6, Po7, Cam1, Cam2, PABB)
@@ -17,8 +18,8 @@ matplotlib.rcParams['ps.fonttype'] = 42
 #           info [struct]
 #           time_ranges: array([[ 0.], [inf]])
 
-Home_dir = '/Volumes/SAMSUNG USB/TDT Fiber Photometry'
-mice = ['4030']
+Home_dir = '/Volumes/Kristine/D2_Ethanol_FiPho/'
+mice = ['4832']
 #Done:
 #Need to do:
 for mouse in mice:

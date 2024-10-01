@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Oct  5 15:01:40 2022
+
+@author: kristineyoon
+"""
+
 # home_dir = '/Volumes/SAMSUNG USB/Med Associates'
 # file = '/Volumes/SAMSUNG USB/Med Associates/4030/2021-11-03_16h59m_Subject 4030.txt'
 # finfo = file[-8:-4]
@@ -56,19 +64,21 @@ def read_med(file, finfo, var_cols, col_n='C:'):
             if reach:
                 return vC
 
+
 def load_formattedMedPC_df(home_dir, mice):
     Columns=['Mouse', 'Date', 'Event', 'Timestamp']
+    dates=[]
     events=[
         'ActiveLever', 
-        'Cue'
+        #'Cue',
         #'LeverPress' 
-        #'Lick'
+        'Lick'
         ] 
     arrays=[ 
         'J:', 
-        'L:' 
+        #'L:' 
         #'N:' 
-        #'O:'
+        'O:'
         ]
     Med_log=pd.DataFrame(columns=Columns)
     
@@ -82,7 +92,7 @@ def load_formattedMedPC_df(home_dir, mice):
             date=f[:16]
             
             for event,col_n in zip(events, arrays):
-                Timestamps=read_med(os.path.join(directory, f),[f[-6:-4], f[:10]], var_cols=5,col_n=col_n) 
+                Timestamps=read_med(os.path.join(directory, f),[f[-9:-4], f[:10]], var_cols=5,col_n=col_n) 
                 #Timestamps is a dataframe
                 if len(Timestamps)!=0:
                     Timestamps.columns=['Timestamp']
@@ -102,12 +112,63 @@ def load_formattedMedPC_df(home_dir, mice):
     return Med_log
 
 
-home_dir = '//Volumes/Kristine/EtOH_SA_Pilot/ITI/'
-mice = ['F1', 'F2', 'F3', 'F4', 'M1', 'M2', 'M3', 'M4']
-#'4032','4033','4034','4035','4036','4037','4038','4039','4041'
+home_dir = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/EtOHSA_SexDiff/ITI'
+mice = ['SD1-5','SD2-3','SD4-1','SD2-5','SD2-2','SD3-4','SD3-2','SD3-5','SD4-4','SD4-3','SD2-1']
+
+home_dir = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/EtOHSA_SexDiff/3%_ITI'
+mice = ['SD1-5','SD2-3','SD4-1','SD2-5','SD2-2','SD3-4','SD3-5','SD4-4','SD4-3']
+
 mpc_df = load_formattedMedPC_df(home_dir, mice)
 mpc_df.to_csv('Med_log.csv', index = False)
+dates = []
 
+for mouse in mice:
+    directory=os.path.join(home_dir, mouse)
+    files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and f[0]!='.')]
+        
+    for i,f in enumerate(files):
+        print(f)
+        date=f[:16]
+        dates.append(date)
+
+
+mouse_latency = {}
+for mouse in mice:
+    directory=os.path.join(home_dir, mouse)
+    files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and f[0]!='.')]
+    files.sort()
+        
+    for i,f in enumerate(files):
+        print(f)
+        date=f[:16]
+        print(date)
+        cue_time = []
+        lever_time = []
+        latency = []
+        
+        for i in range(len(mpc_df)):
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,1] == date and mpc_df.iloc[i,2] == 'ActiveLever':
+                cue_time.append(mpc_df.iloc[i,3])
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,1] == date and mpc_df.iloc[i,2] == 'Lick':
+                lever_time.append(mpc_df.iloc[i,3])
+                
+        for i in range (len(cue_time)):
+            for k in range (len(lever_time)):
+                if lever_time[k] - cue_time[i] <= 20 and lever_time[k] - cue_time[i] > 0:
+                    latency.append(lever_time[k] - cue_time[i])
+        if len(latency) != 0:
+               avg_latency = sum(latency)/len(latency)
+        mouse_latency[str(mouse),str(date[0:10])]=avg_latency
+
+
+mouse_df = pd.DataFrame.from_dict(mouse_latency, orient='index')
+        
+        
+        
+        
+        
+        
+        
         
         
         

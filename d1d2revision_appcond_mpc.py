@@ -1,14 +1,11 @@
-# home_dir = '/Volumes/SAMSUNG USB/Med Associates'
-# file = '/Volumes/SAMSUNG USB/Med Associates/4030/2021-11-03_16h59m_Subject 4030.txt'
-# finfo = file[-8:-4]
-# var_cols = 5
-# col_n ='W:'
-#files= ['2021-11-05_12h02m_Subject 4041.txt', '2021-11-04_11h09m_Subject 4041.txt', '2021-11-03_16h23m_Subject 4041.txt']
+#for d1/d2 revisions
 
 import pandas as pd
 import pandas
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+
 
 def read_med(file, finfo, var_cols, col_n='C:'):
     """ Function to read-write MED raw data to csv
@@ -59,30 +56,26 @@ def read_med(file, finfo, var_cols, col_n='C:'):
 def load_formattedMedPC_df(home_dir, mice):
     Columns=['Mouse', 'Date', 'Event', 'Timestamp']
     events=[
-        'ActiveLever', 
-        'Cue'
-        #'LeverPress' 
-        #'Lick'
+        'Trial', 
+        'NosePoke'
         ] 
     arrays=[ 
-        'J:', 
-        'L:' 
-        #'N:' 
-        #'O:'
+        'G:', 
+        'D:'
         ]
     Med_log=pd.DataFrame(columns=Columns)
     
     for mouse in mice:
         directory=os.path.join(home_dir, mouse)
         files = [f for f in os.listdir(directory) 
-                  if (os.path.isfile(os.path.join(directory, f)) and f[0]!='.')]
+                  if (os.path.isfile(os.path.join(directory, f)) and f[0]=='2')]
         
         for i,f in enumerate(files):
             print(f)
             date=f[:16]
             
             for event,col_n in zip(events, arrays):
-                Timestamps=read_med(os.path.join(directory, f),[f[-6:-4], f[:10]], var_cols=5,col_n=col_n) 
+                Timestamps=read_med(os.path.join(directory, f),[f[-8:-4], f[:10]], var_cols=5,col_n=col_n) 
                 #Timestamps is a dataframe
                 if len(Timestamps)!=0:
                     Timestamps.columns=['Timestamp']
@@ -102,19 +95,67 @@ def load_formattedMedPC_df(home_dir, mice):
     return Med_log
 
 
-home_dir = '//Volumes/Kristine/EtOH_SA_Pilot/ITI/'
-mice = ['F1', 'F2', 'F3', 'F4', 'M1', 'M2', 'M3', 'M4']
+home_dir = '/Volumes/Kristine/D1D2Revisions/AppetitiveConditioningMedPC'
+mice = ['5355',
+ '5447',
+ '5138',
+ '5139',
+ '5356',
+ '5436',
+ '5437',
+ '5448',
+ '5449',
+ '5450',
+ '5462',
+ '5463',
+ '5464',
+ '5634',
+ '5635',
+ '5961',
+ '5962']
+#, 'F2', 'F3', 'F4', 'M1', 'M2', 'M3', 'M4'
 #'4032','4033','4034','4035','4036','4037','4038','4039','4041'
 mpc_df = load_formattedMedPC_df(home_dir, mice)
 mpc_df.to_csv('Med_log.csv', index = False)
 
+poke_latency = {}
+allsessionpokes = {}
+for mouse in mice:
+    directory=os.path.join(home_dir, mouse)
+    files = [f for f in os.listdir(directory) if f[0]=='2' and (os.path.isfile(os.path.join(directory, f)))]
+    files.sort()
+    pokespermouse = []
         
+    for i,f in enumerate(files):
+        print(f)
+        date=f[:16]
+        print(date)
+        nosepoke_time = []
+        trial_time = []
+        latency = []
         
+        for i in range(len(mpc_df)):
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,1] == date and mpc_df.iloc[i,2] == 'NosePoke':
+                nosepoke_time.append(mpc_df.iloc[i,3])
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,1] == date and mpc_df.iloc[i,2] == 'Trial':
+                trial_time.append(mpc_df.iloc[i,3])
         
-        
-        
-        
-        
-        
-        
+        k=0
+        while k<len(trial_time):
+            pokespersession = []
+            for i in range (len(nosepoke_time)):
+                if nosepoke_time[i] - trial_time[k] <= 30 and nosepoke_time[i] - trial_time[k] > 0:
+                    pokespersession.append(nosepoke_time[i]- trial_time[k])
+            if len(pokespersession) != 0:
+                latency.append(pokespersession)
+            for items in pokespersession:
+                pokespermouse.append(items)
+            k += 1
+        poke_latency[str(mouse),str(date[0:10])]=latency
+    
+    allsessionpokes[mouse]=pokespermouse
+
+
+mouse_df = pd.DataFrame.from_dict(poke_latency, orient='index')
+allkeys = list(poke_latency.keys())
 
