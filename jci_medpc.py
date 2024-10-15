@@ -53,71 +53,95 @@ def read_med(file, finfo, var_cols, col_n='C:'):
             if reach:
                 return vC
 
-def load_formattedMedPC_df(home_dir, mice):
+def load_formattedMedPC_df(home_dir,treatment, mice):
     Columns=['Mouse', 'Date', 'Event', 'Timestamp']
     events=[
-        'ActiveLever', 
-        'Lick',
-        'No Response',
-        'Cue'
+        'Hits', 
+        'Miss',
+        'PreMature',
+        'Licks'
         ] 
     arrays=[ 
         'J:', 
-        'O:',
-        'P:',
-        'L:'
+        'G:',
+        'E:',
+        'P:'
         ]
     Med_log=pd.DataFrame(columns=Columns)
     
-    for mouse in mice:
-        directory=os.path.join(home_dir, mouse)
-        files = [f for f in os.listdir(directory) 
-                  if (os.path.isfile(os.path.join(directory, f)) and f[0]!='.')]
-        files.sort()
-        for i,f in enumerate(files):
-            print(f)
-            date=f[:16]
-            
-            for event,col_n in zip(events, arrays):
-                Timestamps=read_med(os.path.join(directory, f),[f[-9:-4], f[:10]], var_cols=5,col_n=col_n) 
-                #Timestamps is a dataframe
-                if len(Timestamps)!=0:
-                    Timestamps.columns=['Timestamp']
-                    Timestamps.at[:,'Mouse']=mouse
-                    Timestamps.at[:,'Date']=date
-                    Timestamps.at[:,'Event']=event
-                    Med_log=pd.concat([Med_log,Timestamps],ignore_index=True) 
-                elif len(Timestamps)== 0:
-                    Timestamps.columns=['Timestamp']
-                    Timestamps.at[:,'Timestamp']= [0]
-                    Timestamps.at[:,'Mouse']=mouse
-                    Timestamps.at[:,'Date']=date
-                    Timestamps.at[:,'Event']=event
-                    Med_log=pd.concat([Med_log,Timestamps],ignore_index=True) 
-    #Format 'Timestamp' from str to float
-    Med_log['Timestamp'] = Med_log['Timestamp'].astype(float)
-    # Add a column called 'Session'
-    for mouse in mice:
-        mouse_log=Med_log.loc[np.equal(Med_log['Mouse'], mouse)]
-        for i,day in enumerate(np.unique(mouse_log['Date'])):
-            day_log=mouse_log.loc[np.equal(mouse_log['Date'], day)]
-            Med_log.at[day_log.index, 'Session']=i
+    for group in treatment:
+        for mouse in mice:
+            directory=os.path.join(home_dir, group, mouse)
+            files = [f for f in os.listdir(directory) 
+                      if (os.path.isfile(os.path.join(directory, f)) and f[0]!='.')]
+            files.sort()
+            for i,f in enumerate(files):
+                print(f)
+                date=f[:16]
+                
+                for event,col_n in zip(events, arrays):
+                    Timestamps=read_med(os.path.join(home_dir, group, mouse, f),[f[-8:-4], f[:10]], var_cols=5,col_n=col_n) 
+                    #Timestamps is a dataframe
+                    if len(Timestamps)!=0:
+                        Timestamps.columns=['Timestamp']
+                        Timestamps.at[:,'Mouse']=mouse
+                        Timestamps.at[:,'Date']=date
+                        Timestamps.at[:,'Group']=group
+                        Timestamps.at[:,'Event']=event
+                        Med_log=pd.concat([Med_log,Timestamps],ignore_index=True) 
+                    elif len(Timestamps)== 0:
+                        Timestamps.columns=['Timestamp']
+                        Timestamps.at[:,'Timestamp']= [0]
+                        Timestamps.at[:,'Mouse']=mouse
+                        Timestamps.at[:,'Date']=date
+                        Timestamps.at[:,'Group']=group
+                        Timestamps.at[:,'Event']=event
+                        Med_log=pd.concat([Med_log,Timestamps],ignore_index=True) 
+        #Format 'Timestamp' from str to float
+        Med_log['Timestamp'] = Med_log['Timestamp'].astype(float)/10
     return Med_log
 
 
-home_dir = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/EtOHSA_SexDiff/'
-path = 'ITI'
-allfiles = os.path.join(home_dir, path)
-mice = ['SD1-1','SD1-2','SD1-4','SD1-5','SD2-1','SD2-2','SD2-3','SD2-4','SD2-5','SD3-1','SD3-2','SD3-4','SD3-5','SD4-1','SD4-2','SD4-3','SD4-4','SD4-5','SD5-1','SD5-2','SD6-1','SD6-2']
+home_dir = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/JCI/'
+treatment = ['Amph0.01','Amph0.003','Saline1','Saline2']
+mice = ['7360','7361','7362','7363','7364','7365','7366','7367','7368','7369',
+        '7370','7371','7372','7373','7374','7375','7376','7377','7378','7379']
 
-sip_access = 10
-mpc_df = load_formattedMedPC_df(allfiles, mice)
+mpc_df = load_formattedMedPC_df(home_dir,treatment, mice)
 mpc_df.to_csv('Med_log.csv', index = False)
 
 
 ########################### IDENTIFIERS ##############################
-females = ['SD1-1','SD1-2','SD1-4','SD1-5', 'SD3-1','SD3-2','SD3-4','SD3-5','SD5-1','SD5-2' ]
-males = ['SD2-1','SD2-2','SD2-3','SD2-4','SD2-5', 'SD4-1','SD4-2','SD4-3','SD4-4','SD4-5','SD6-1','SD6-2']
+females = ['7360','7361','7362','7363','7364','7365','7366','7367','7368','7369']
+males = ['7370','7371','7372','7373','7374','7375','7376','7377','7378','7379']
+
+first_range = [0,17999]
+second_range = [18000,36000]
+
+first_half = pd.DataFrame()
+second_half = pd.DataFrame()
+
+all_dict = {}
+for mouse in mice:
+    for group in treatment:
+        hits = []
+        misses = []
+        prematures = []
+        licks = []
+        for i in range(len(mpc_df)):
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,4] == group and mpc_df.iloc[i,2] == 'Hits':
+                hits.append(mpc_df.iloc[i,3])
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,4] == group and mpc_df.iloc[i,2] == 'Miss':
+                misses.append(mpc_df.iloc[i,3])
+            if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,4] == group and mpc_df.iloc[i,2] == 'PreMature':
+                prematures.append(mpc_df.iloc[i,3])
+            # if mpc_df.iloc[i,0] == mouse and mpc_df.iloc[i,4] == group and mpc_df.iloc[i,2] == 'Licks':
+            #     licks.append(mpc_df.iloc[i,3])
+        all_dict[mouse,group]= hits, misses, prematures
+
+
+for 
+
 
 
 ##################################################################################
