@@ -61,6 +61,8 @@ bout_peak_indices = {}
 timerange_cue = [-2, 5]
 timerange_lever = [-2, 5]
 timerange_lick = [-2, 10]
+totalactivetrace_dict = {}
+active_time = [-2,20]
 cue_time = 20
 lick_time= 10
 N = 100
@@ -119,6 +121,8 @@ for mouse in mice:
                 track_licks.append(fp_df.iloc[i,1])
             if fp_df.iloc[i,0] == 'Timeout Press':
                 track_to.append(fp_df.iloc[i,1])
+                
+        
 
         ########################## CUE ALIGNMENT ##########################    
 
@@ -160,7 +164,11 @@ for mouse in mice:
             for k in range(0, len(trial), N):
                 sampletrial.append(np.mean(trial[k:k+N-1]))
             
-            avglevertrace_dict[mouse,Dates.index(date),track_lever[i]]= sampletrial
+            for trial_num in range(len(track_cue)):
+                if track_lever[i] - track_cue[trial_num] > 0 and track_lever[i] - track_cue[trial_num] < 20:
+                    cue_trial = trial_num
+            
+            avglevertrace_dict[mouse,Dates.index(date),cue_trial]= track_lever[i], sampletrial
 
         ################## FIRST LICK ALIGNMENT ################3
         track_flicks = []
@@ -190,8 +198,11 @@ for mouse in mice:
             sampletrial=[]
             for k in range(0, len(trial), N):
                 sampletrial.append(np.mean(trial[k:k+N-1]))
-                
-            avgflicktrace_dict[mouse,Dates.index(date),track_flicks[i]]= sampletrial
+            
+            for trial_num in range(len(track_cue)):
+                if track_flicks[i] - track_cue[trial_num] > 0 and track_flicks[i] - track_cue[trial_num] < 30:
+                    cue_trial = trial_num
+            avgflicktrace_dict[mouse,Dates.index(date),cue_trial]= track_flicks[i], sampletrial
         
         
         ############ LICKBOUT ALIGNMENT #################
@@ -225,6 +236,39 @@ for mouse in mice:
                     trial_num = i
             bout_traces[mouse, Dates.index(date),trial_num, length]=(sampletrial)
             avglickbouttrace_dict[mouse,Dates.index(date),trial_num]= start_time, length, sampletrial
+
+
+        ########################## ALL ALIGNMENT ##########################    
+        
+        for i in range(len(track_cue)):
+            cue_zero = round(track_cue[i] * fs)
+            cue_baseline = cue_zero + timerange_cue[0] * fs
+            cue_end = cue_zero + active_time[1] * fs
+            
+            aligntobase = np.mean(df.iloc[cue_baseline:cue_zero,2])
+            rawtrial = np.array(df.iloc[cue_baseline:cue_end,2])
+            
+            trial = []
+            for each in rawtrial:
+                trial.append((each-aligntobase)/np.std(df.iloc[cue_baseline:cue_zero,2]))
+                
+            
+            sampletrial=[]
+            for k in range(0, len(trial), N):
+                sampletrial.append(np.mean(trial[k:k+N-1]))
+            
+            for time_lever in range(len(track_lever)):
+                if  track_lever[time_lever] - track_cue[i] > 0 and track_lever[time_lever] - track_cue[i] < 20:
+                    levertime = track_lever[time_lever]
+            
+            for time_flick in range(len(track_flicks)):
+                if track_flicks[time_flick] - track_cue[i] > 0 and track_flicks[time_flick] - track_cue[i] < 30:
+                    flicktime = track_flicks[time_flick]
+                    
+            totalactivetrace_dict[mouse,Dates.index(date),i]= track_cue[i], levertime, flicktime, sampletrial
+
+        
+
 
 ##############################################################
 ### FIRST CHECK POINT
@@ -278,6 +322,28 @@ plt.xticks(np.arange(0,len(avgflicktrace_dict[str(mouse),session,trial][1])+1,le
            rotation=0)
 plt.legend()
 plt.xlabel('First Lick Onset (s)')
+
+
+
+
+##############################################################
+### HEAT MAP
+##############################################################
+
+
+#### TRIALS ON HEATMAP ALIGNED TO CUE ####
+fig, axs = plt.subplots(8,2)
+for i in range(8):
+    for mouse,session,trial in avgcuetrace_dict:
+        if session == i:
+            axs[session,0] = sns.heatmap(avgcuetrace_dict[mouse,session,trial][1], cmap='RdBu', vmin=-5, vmax=5, cbar_kws={'label': 'Delta F/F From Baseline'})
+plt.xticks(np.arange(0,len(zscore_cue[0])+1,len(zscore_cue[0])/(timerange_cue[1]-timerange_cue[0])), 
+            np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+            rotation=0)
+plt.axvline(x=len(zscore_cue[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black', label='Cue Onset')
+plt.ylabel('Trials')
+plt.xlabel('Cue Onset')
+
 
 
 ##############################################################
@@ -406,6 +472,80 @@ for i in range(8):
         if session == i:
             cue_df.at[num,i]=allcuepeakheights[mouse,session,trial]
             num = num + 1
+
+
+
+
+
+allleverpeakheights={}
+from scipy.signal import find_peaks         
+peakheight_lever_df = pd.DataFrame(columns=['Mouse','Session','Trial','X-Axis','PeakHeight'])
+plt.figure(figsize=(10, 6))
+for mouse,session,trial in avglevertrace_dict:
+    if mouse in mice:
+        if session in range(8):
+            if trial in range (10):
+                avgtrace = avglevertrace_dict[str(mouse),session,trial][1]
+                param_thresh= 0.0
+                param_prom= 0.6
+                peaks, properties = find_peaks(avgtrace, threshold = param_thresh, prominence=param_prom, height=.01)
+                plt.plot(avgtrace, label=f'Session {session}', alpha=0.2)
+                maxpeak=0
+                for k in range(len(peaks)):
+                    if peaks[k] > len(avgtrace)/(timerange_lever[1]-timerange_lever[0])*(-0.5-timerange_lever[0]) and peaks[k] < len(avgtrace)/(timerange_lever[1]-timerange_lever[0])*(0.5-timerange_lever[0]):
+                        if properties['peak_heights'][k] > maxpeak:
+                            maxpeak = properties['peak_heights'][k]
+                            time = peaks[k]
+                            plt.scatter(x=peaks[k], y= properties['peak_heights'][k], alpha=0.8)
+                
+                num = len(peakheight_lever_df)
+                peakheight_lever_df.at[num,'Mouse']=mouse
+                peakheight_lever_df.at[num,'Session']=session
+                peakheight_lever_df.at[num,'Trial']=trial
+                if maxpeak > 0:
+                    peakheight_lever_df.at[num,'X-Axis']= time
+                    peakheight_lever_df.at[num,'PeakHeight']= maxpeak
+                    allleverpeakheights[mouse,session,trial] = maxpeak
+                else:
+                    peakheight_lever_df.at[num,'X-Axis']= np.nan
+                    peakheight_lever_df.at[num,'PeakHeight']= np.nan
+                    allleverpeakheights[mouse,session,trial] = maxpeak
+plt.axhline(y=0, linestyle=':', color='black')
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(avgtrace)+1,len(avgtrace)/(timerange_lever[1]-timerange_lever[0])), 
+           np.arange(timerange_lever[0], timerange_lever[1]+1,1, dtype=int),
+           rotation=0)
+plt.axvline(x=len(avgtrace)/(timerange_lever[1]-timerange_lever[0])*(0-timerange_lever[0]),linewidth=1, color='black')
+plt.ylabel('DF/F')
+plt.title('Average Lever-aligned Trace with SEM by Session')
+plt.show()
+
+plt.figure()
+leverpeakheight = []
+for i in range(8):
+    session_peakheight = []
+    for mouse,session,trial in allleverpeakheights:
+        if session == i:
+            session_peakheight.append(allcuepeakheights[mouse,session,trial])
+            plt.scatter(x=session,y= allcuepeakheights[mouse,session,trial], color=colors10[session], alpha=0.05)
+    leverpeakheight.append(session_peakheight)
+    plt.scatter(x=i, y=np.mean(session_peakheight), color=colors10[i])
+    plt.errorbar(x=i, y=np.mean(session_peakheight), yerr=sem(session_peakheight), ecolor=colors10[i],capsize=3)
+plt.xlabel('Session')
+plt.ylim(0,8)
+plt.ylabel('Peak Height At Lvever')
+plt.show()
+
+
+lever_df=pd.DataFrame()
+for i in range(8):
+    num = 0
+    for mouse,session,trial in allleverpeakheights:
+        if session == i:
+            lever_df.at[num,i]=allcuepeakheights[mouse,session,trial]
+            num = num + 1
+
+
 
 
 
@@ -812,7 +952,7 @@ for key, trace in bout_traces.items():
                           ((offset_range[1]-timerange_lick[0])))
     offset_bouts[mouse,licklength]=offset_t
     
-    if len(trace) == len(bout_traces[('7321', 62)]):
+    if len(trace) == len(avgtrace):
         
         param_thresh= 0.0
         param_prom= 0.6
@@ -886,6 +1026,16 @@ offset_bout_df['Lengths']= lengths
 offset_bout_df['Offset']= offset
 
 
+peakheght_by_bout_df=pd.DataFrame()
+cell = 0
+for key, value in peakheight_bouts.items():
+    mouse, date, trial, licklength =key
+    peak = value
+    peakheght_by_bout_df.at[cell,'mouse'] = mouse
+    peakheght_by_bout_df.at[cell,'date'] = date
+    peakheght_by_bout_df.at[cell,'licklength'] = licklength
+    peakheght_by_bout_df.at[cell,'peak'] = peak
+    cell = cell + 1
 
 ##############################################################
 ######################## CUE ANALYSIS ########################
