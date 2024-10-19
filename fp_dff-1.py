@@ -244,7 +244,8 @@ for mouse in mice:
             cue_zero = round(track_cue[i] * fs)
             cue_baseline = cue_zero + timerange_cue[0] * fs
             cue_end = cue_zero + active_time[1] * fs
-            
+            levertime = np.nan
+            flicktime = np.nan
             aligntobase = np.mean(df.iloc[cue_baseline:cue_zero,2])
             rawtrial = np.array(df.iloc[cue_baseline:cue_end,2])
             
@@ -257,13 +258,13 @@ for mouse in mice:
             for k in range(0, len(trial), N):
                 sampletrial.append(np.mean(trial[k:k+N-1]))
             
-            for time_lever in range(len(track_lever)):
-                if  track_lever[time_lever] - track_cue[i] > 0 and track_lever[time_lever] - track_cue[i] < 20:
-                    levertime = track_lever[time_lever]
-            
-            for time_flick in range(len(track_flicks)):
-                if track_flicks[time_flick] - track_cue[i] > 0 and track_flicks[time_flick] - track_cue[i] < 30:
-                    flicktime = track_flicks[time_flick]
+            for l in range(len(track_lever)):
+                if  track_lever[l] - track_cue[i] > 0 and track_lever[l] - track_cue[i] < 20:
+                    levertime = track_lever[l]
+
+            for m in range(len(track_flicks)):
+                if track_flicks[m] - track_cue[i] > 0 and track_flicks[m] - track_cue[i] < 30:
+                    flicktime = track_flicks[m]
                     
             totalactivetrace_dict[mouse,Dates.index(date),i]= track_cue[i], levertime, flicktime, sampletrial
 
@@ -331,19 +332,94 @@ plt.xlabel('First Lick Onset (s)')
 ##############################################################
 
 
-#### TRIALS ON HEATMAP ALIGNED TO CUE ####
-fig, axs = plt.subplots(8,2)
-for i in range(8):
-    for mouse,session,trial in avgcuetrace_dict:
-        if session == i:
-            axs[session,0] = sns.heatmap(avgcuetrace_dict[mouse,session,trial][1], cmap='RdBu', vmin=-5, vmax=5, cbar_kws={'label': 'Delta F/F From Baseline'})
-plt.xticks(np.arange(0,len(zscore_cue[0])+1,len(zscore_cue[0])/(timerange_cue[1]-timerange_cue[0])), 
-            np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
-            rotation=0)
-plt.axvline(x=len(zscore_cue[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black', label='Cue Onset')
-plt.ylabel('Trials')
-plt.xlabel('Cue Onset')
+#### TRIALS ON HEATMAP ALIGNED TO CUE by session sorted by latency to lick ####
 
+for mouse in mice:
+    alltraces=[]
+    for i in range(8):
+        bysession = {}
+        for subj,session,trial in totalactivetrace_dict:
+            if session == i and subj == mouse and trial in range (10):
+                if np.isnan(totalactivetrace_dict[subj,i,trial][2]):
+                    bysession[totalactivetrace_dict[subj,i,trial][0]]= totalactivetrace_dict[subj,i,trial][3]
+                else:
+                    bysession[totalactivetrace_dict[subj,i,trial][2]-totalactivetrace_dict[subj,i,trial][0]]= totalactivetrace_dict[subj,i,trial][3]
+        sorted_bysession=[]
+        for i in sorted(bysession.keys()):
+            #print(i)
+            sorted_bysession.append(bysession[i])
+        alltraces.append(sorted_bysession)
+    
+    fig, axs = plt.subplots(8, sharex=True)
+    for i in range (8):
+        bysessiondf= pd.DataFrame(alltraces[i])    
+        sns.heatmap(bysessiondf, cmap='RdBu', vmin=-5, vmax=5, ax=axs[i])
+        axs[i].axvline(x=(bysessiondf.shape[1])/(active_time[1]-active_time[0])*(0-active_time[0]),linewidth=1, color='black', label='Cue Onset')
+    plt.xticks(np.arange(0,bysessiondf.shape[1]+1,(bysessiondf.shape[1]+1)/(active_time[1]-active_time[0])*2), 
+                np.arange(active_time[0], active_time[1],2, dtype=int),
+                rotation=0)
+    
+    plt.ylabel('Trials')
+    plt.xlabel('Time (sec)')
+    plt.show()
+
+#### TRIALS ON HEATMAP ALIGNED TO CUE of all session sorted by latency to lick ####
+
+for mouse in mice:
+    alltraces={}
+    for i in range(8):
+        for subj,session,trial in totalactivetrace_dict:
+            if session == i and subj == mouse and trial in range (10):
+                if np.isnan(totalactivetrace_dict[subj,i,trial][2]):
+                    continue
+                else:
+                    alltraces[totalactivetrace_dict[subj,i,trial][2]-totalactivetrace_dict[subj,i,trial][0]]= totalactivetrace_dict[subj,i,trial][3]
+    
+    sorted_bylatency=[]
+    for i in sorted(alltraces.keys()):
+        sorted_bylatency.append(alltraces[i])
+    
+    plt.figure()
+    bysessiondf= pd.DataFrame(sorted_bylatency)    
+    sns.heatmap(bysessiondf, cmap='RdBu', vmin=-5, vmax=5, )
+    plt.axvline(x=(bysessiondf.shape[1])/(active_time[1]-active_time[0])*(0-active_time[0]),linewidth=1, color='black', label='Cue Onset')
+    plt.xticks(np.arange(0,bysessiondf.shape[1]+1,(bysessiondf.shape[1]+1)/(active_time[1]-active_time[0])*2), 
+                np.arange(active_time[0], active_time[1],2, dtype=int),
+                rotation=0)
+    plt.title(f'{mouse}')
+    plt.ylabel('Trials')
+    plt.xlabel('Time (sec)')
+    plt.show()
+
+
+#### TRIALS ON HEATMAP ALIGNED TO CUE of all session sorted by latency to lick ####
+
+for mouse in mice:
+    alltraces={}
+    for i in range(8):
+        for subj,session,trial in totalactivetrace_dict:
+            if session == i and subj == mouse and trial in range (10):
+                if np.isnan(totalactivetrace_dict[subj,i,trial][2]):
+                    continue
+                else:
+                    alltraces[totalactivetrace_dict[subj,i,trial][2]-totalactivetrace_dict[subj,i,trial][0]]= totalactivetrace_dict[subj,i,trial][3]
+    
+    sorted_bylatency=[]
+    for i in sorted(alltraces.keys()):
+        sorted_bylatency.append(alltraces[i])
+
+    
+    plt.figure()
+    bysessiondf= pd.DataFrame(sorted_bylatency)    
+    sns.heatmap(bysessiondf, cmap='RdBu', vmin=-5, vmax=5, )
+    plt.axvline(x=(bysessiondf.shape[1])/(active_time[1]-active_time[0])*(0-active_time[0]),linewidth=1, color='black', label='Cue Onset')
+    plt.xticks(np.arange(0,bysessiondf.shape[1]+1,(bysessiondf.shape[1]+1)/(active_time[1]-active_time[0])*2), 
+                np.arange(active_time[0], active_time[1],2, dtype=int),
+                rotation=0)
+    plt.title(f'{mouse}')
+    plt.ylabel('Trials')
+    plt.xlabel('Time (sec)')
+    plt.show()
 
 
 ##############################################################
@@ -844,7 +920,7 @@ plt.savefig('/Users/kristineyoon/Documents/leverbysessions.pdf', transparent=Tru
 session_data = {}  
 for key, value in avgflicktrace_dict.items():
     mouse, session, trial = key
-    trialtrace = value
+    time, trialtrace = value
     if session not in session_data:
         session_data[session] = []
     session_data[session].append(trialtrace)
@@ -856,7 +932,7 @@ for session, traces in session_data.items():
 plt.figure(figsize=(10, 6))
 for session, mean_trace in mean_traces.items():
     sem_trace = sem_traces[session]
-    if session in range(2,8):
+    if session in range(3):
         plt.plot(mean_trace, color=sns.color_palette("husl", 8)[int(session)], label=f'Session {session}')
         plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=sns.color_palette("husl", 8)[int(session)], alpha=0.1)
 plt.xlabel('Time (samples)')
