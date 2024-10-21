@@ -421,6 +421,39 @@ for mouse in mice:
     plt.xlabel('Time (sec)')
     plt.show()
 
+#### TRIALS ON HEATMAP ALIGNED TO CUE of all mouse sorted by latency to lick ####
+
+
+alltraces = {}
+
+for subj, session, trial in totalactivetrace_dict:
+    if trial in range(10):
+        if np.isnan(totalactivetrace_dict[subj, session, trial][2]):
+            continue
+        else:
+            alltraces[totalactivetrace_dict[subj, session, trial][2]-totalactivetrace_dict[subj,
+                                                                                           session, trial][0]] = totalactivetrace_dict[subj, session, trial][3]
+
+sorted_bylatency = []
+for i in reversed(sorted(alltraces.keys())):
+    sorted_bylatency.append(alltraces[i])
+
+
+plt.figure(figsize=(10, 12))
+bysessiondf = pd.DataFrame(sorted_bylatency)
+sns.heatmap(bysessiondf, cmap=sns.diverging_palette(255, 28, l=68, as_cmap=True), vmin=-5, vmax=5 )
+plt.axvline(x=(bysessiondf.shape[1])/(active_time[1]-active_time[0])
+            * (0-active_time[0]), linewidth=1, color='black', label='Cue Onset')
+plt.xticks(np.arange(0, bysessiondf.shape[1]+1, (bysessiondf.shape[1]+1)/(active_time[1]-active_time[0])*2),
+           np.arange(active_time[0], active_time[1], 2, dtype=int),
+           rotation=0)
+plt.ylabel('Trials')
+plt.xlabel('Time (sec)')
+plt.show()
+plt.savefig(
+    '/Users/kristineyoon/Documents/heatmaptracesallmice.pdf', transparent=True)
+
+
 
 ##############################################################
 ### BEHAVIORAL PARADIGMS
