@@ -115,24 +115,24 @@ for mouse in mice:
 
                 
         
-        # plt.figure(figsize=(12, 6))
-        # totaltrace = np.array(df.iloc[:,2])
-        # totaltracemean = np.mean(totaltrace)
-        # totaltracestddev = np.std(totaltrace)
-        # totaltracezscore = (totaltrace-totaltracemean)/totaltracestddev
-        # multiplied_track_licks = [item * fs for item in track_licks]
-        # multiplied_track_lever = [item * fs for item in track_lever]
-        # multiplied_track_cue = [item * fs for item in track_cue]
-        # multiplied_track_leverend = [item + 20*fs for item in multiplied_track_lever]
+        plt.figure(figsize=(12, 6))
+        totaltrace = np.array(df.iloc[:,2])
+        totaltracemean = np.mean(totaltrace)
+        totaltracestddev = np.std(totaltrace)
+        totaltracezscore = (totaltrace-totaltracemean)/totaltracestddev
+        multiplied_track_licks = [item * fs for item in track_licks]
+        multiplied_track_lever = [item * fs for item in track_lever]
+        multiplied_track_cue = [item * fs for item in track_cue]
+        multiplied_track_leverend = [item + 20*fs for item in multiplied_track_lever]
         
         
-        # plt.plot(totaltracezscore)
-        # plt.eventplot(multiplied_track_licks, colors='red', lineoffsets=0.5, label='lick')
-        # plt.eventplot(multiplied_track_lever, colors='green', lineoffsets=0.5, label='leverpress/ sipper out')
-        # plt.eventplot(multiplied_track_leverend, colors='blue', lineoffsets=0.5, label='end session')
-        # plt.eventplot(multiplied_track_cue, colors='pink', lineoffsets=0.5, label='cue')
-        # plt.suptitle(f'{mouse} and {Dates.index(date)}')
-        # plt.legend()
+        plt.plot(totaltracezscore)
+        plt.eventplot(multiplied_track_licks, colors='red', lineoffsets=0.5, label='lick')
+        plt.eventplot(multiplied_track_lever, colors='green', lineoffsets=0.5, label='leverpress/ sipper out')
+        plt.eventplot(multiplied_track_leverend, colors='blue', lineoffsets=0.5, label='end session')
+        plt.eventplot(multiplied_track_cue, colors='pink', lineoffsets=0.5, label='cue')
+        plt.suptitle(f'{mouse} and {Dates.index(date)}')
+        plt.legend()
 
 ########################## CUE ALIGNMENT ##########################    
         zscore_cue = []
