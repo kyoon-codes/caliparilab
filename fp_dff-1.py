@@ -408,6 +408,7 @@ plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timeran
 plt.ylabel('z-score')
 plt.title('Average Cue Aligned Trace with SEM by Session')
 plt.legend()
+plt.ylim(-1,4)
 
 plt.savefig('/Users/kristineyoon/Documents/cuebysessions.pdf', transparent=True)
 plt.show()
@@ -521,11 +522,11 @@ plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timer
 plt.axhline(y=0, linestyle=':', color='black')
 plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
 plt.ylabel('z-score')
-plt.title('Average Cue Aligned Trace with SEM by Session')
+plt.ylim(-3,6)
+plt.title('Average Responding Cue Aligned Trace with SEM by Session')
 plt.legend()
-
-# plt.savefig('/Users/kristineyoon/Documents/respondedcuebysessions.pdf', transparent=True)
-# plt.show()
+plt.savefig('/Users/kristineyoon/Documents/respondedcuebysessions.pdf', transparent=True)
+plt.show()
 
 session_data = {}  
 for key, value in avgcuetrace_dict.items():
@@ -558,11 +559,278 @@ plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timer
 plt.axhline(y=0, linestyle=':', color='black')
 plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
 plt.ylabel('z-score')
-plt.title('Average Cue Aligned Trace with SEM by Session')
+plt.ylim(-3,6)
+plt.title('Average Non-Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+plt.savefig('/Users/kristineyoon/Documents/nonrespondedcuebysessions.pdf', transparent=True)
+plt.show()
+
+
+
+# --------------------------------------------
+#looking at cues that animals licked  v. animals did not lick in previous trial
+# licks -- responding cue v. no licks -- responding cue
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if previoustrial in avgflicktrace1_dict:
+        if trial in range (10):
+            if session not in session_data:
+                session_data[session] = []
+            session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(1,session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(trialtrace)/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average Previous Lick -- Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if previoustrial in avgflicktrace1_dict:
+        continue
+    else:
+        if session not in session_data:
+            session_data[session] = []
+        session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(1,session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(trialtrace)/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average No Lick -- Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+
+
+#--- looking at perfect streak trials or all miss trials
+
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if previoustrial in avgflicktrace1_dict and key in avgflicktrace1_dict:
+    #if previoustrial not in avgflicktrace1_dict and key not in avgflicktrace1_dict:
+        if trial in range (10):
+            if session not in session_data:
+                session_data[session] = []
+            session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(1,session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(trialtrace)/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average Previous Lick -- Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+
+
+# --------------------------------------------
+#looking at non responding cues that animals licked  v. animals did not lick in previous trial
+# licks -- not responding cue v. no licks -- not responding cue
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if key in avgflicktrace1_dict:
+        pass
+    else:
+        if previoustrial in avgflicktrace1_dict and trial in range(10):
+            if session not in session_data:
+                session_data[session] = []
+            session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average Lick -- Non-Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if key in avgflicktrace1_dict:
+        pass
+    else:
+        if previoustrial not in avgflicktrace1_dict and trial in range(10):
+            if session not in session_data:
+                session_data[session] = []
+            session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average No Lick -- Non-Responding Cue Aligned Trace with SEM by Session')
+plt.legend()
+
+# --------------------------------------------
+### no lick -- cue v. lick -- cue
+
+
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if previoustrial in avgflicktrace1_dict:
+        pass
+    else:
+        if session not in session_data:
+            session_data[session] = []
+        session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average No Lick -- Cue Aligned Trace with SEM by Session')
 plt.legend()
 
 
 
+session_data = {}  
+for key, value in avgcuetrace_dict.items():
+    mouse, session, trial = key
+    time, trialtrace, baseline = value
+    previoustrial = mouse, session, trial-1
+    if previoustrial in avgflicktrace1_dict:
+        if session not in session_data:
+            session_data[session] = []
+        session_data[session].append(trialtrace)
+mean_traces = {}
+sem_traces = {}
+for session, traces in session_data.items():
+    mean_traces[session] = np.mean(traces, axis=0)
+    sem_traces[session] = sem(traces)
+plt.figure(figsize=(10, 8))
+for session, mean_trace in mean_traces.items():
+    sem_trace = sem_traces[session]
+    #if session in [1,6]:
+    if session in range(session_ranges):
+    #if session in range(1,7):
+        plt.plot(mean_trace, color=colors10[int(session)], label=f'Session {session}')
+        plt.fill_between(range(len(mean_trace)), mean_trace - sem_trace, mean_trace + sem_trace, color=colors10[int(session)], alpha=0.1)
+plt.xlabel('Time (samples)')
+plt.xticks(np.arange(0,len(mean_trace)+1,len(mean_trace)/(timerange_cue[1]-timerange_cue[0])), 
+           np.arange(timerange_cue[0], timerange_cue[1]+1,1, dtype=int),
+           rotation=0)
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(mean_traces[0])/(timerange_cue[1]-timerange_cue[0])*(0-timerange_cue[0]),linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.ylim(-3,6)
+plt.title('Average Lick -- Cue Aligned Trace with SEM by Session')
+plt.legend()
 
 
 ############################################################################################################################
@@ -631,6 +899,108 @@ for session in range(totalsessions):
 plt.xlabel('Session')
 plt.ylabel('Peak Height At Cue')
 plt.show()
+
+# --------- statistics ---------------------------
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.formula.api import mixedlm
+import pingouin as pg
+
+# Ensure data types are categorical where appropriate
+peak_cue_df["Mouse"] = peak_cue_df["Mouse"].astype("category")
+peak_cue_df["Session"] = peak_cue_df["Session"].astype("category")
+peak_cue_df["Trial"] = peak_cue_df["Trial"].astype("category")
+
+# --- Linear Mixed-Effects Model ---
+# Random intercept for Mouse (accounts for individual baseline differences)
+# Session as a fixed effect
+# Trial nested within Session is handled implicitly via the repeated structure
+model = mixedlm("PeakHeight ~ Session", data=peak_cue_df, groups=peak_cue_df["Mouse"])
+result = model.fit(reml=True)
+print(result.summary())
+
+# --- Post hoc tests (pairwise session comparisons) ---
+# Using estimated marginal means from pingouin
+posthoc = pg.pairwise_tests(
+    dv="PeakHeight",
+    within="Session",
+    subject="Mouse",
+    data=peak_cue_df,
+    parametric=True,
+    padjust="bonf"
+)
+print("\nPost hoc pairwise comparisons (Session effects):")
+print(posthoc)
+
+# --- Optionally: compute within-session trial effects per mouse ---
+trial_effects = (
+    peak_cue_df.groupby(["Mouse", "Session", "Trial"])["PeakHeight"]
+    .mean()
+    .reset_index()
+)
+trial_effects_summary = (
+    trial_effects.groupby(["Session", "Trial"])["PeakHeight"]
+    .agg(["mean", "sem"])
+    .reset_index()
+)
+print("\nWithin-session trial-level summary:")
+print(trial_effects_summary)
+
+##### --------- looking at trials 0 and 9------------------------------------------------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --- Create summary dataframe comparing trial 0 and trial 9 for each session ---
+summary_data = []
+
+for session in sorted(peak_cue_df["Session"].unique()):
+    for trial in [0, 9]:
+        data = peak_cue_df.loc[
+            (peak_cue_df["Session"] == session) & (peak_cue_df["Trial"] == trial),
+            "PeakHeight"
+        ]
+        if not data.empty:
+            summary_data.append({
+                "Session": session,
+                "Trial": trial,
+                "MeanPeakHeight": data.mean(),
+                "SEMPeakHeight": sem(data)
+            })
+
+cue_trial_summary_df = pd.DataFrame(summary_data)
+print(cue_trial_summary_df)
+
+# --- Plot comparison (Trial 0 vs. Trial 9 per session) ---
+plt.figure(figsize=(8,5))
+
+sessions = cue_trial_summary_df["Session"].unique()
+width = 0.35
+x = range(len(sessions))
+
+trial0_means = cue_trial_summary_df.loc[cue_trial_summary_df["Trial"] == 0, "MeanPeakHeight"]
+trial9_means = cue_trial_summary_df.loc[cue_trial_summary_df["Trial"] == 9, "MeanPeakHeight"]
+trial0_sems = cue_trial_summary_df.loc[cue_trial_summary_df["Trial"] == 0, "SEMPeakHeight"]
+trial9_sems = cue_trial_summary_df.loc[cue_trial_summary_df["Trial"] == 9, "SEMPeakHeight"]
+
+plt.bar(
+    [s - width/2 for s in x], trial0_means, width, yerr=trial0_sems, label="Trial 0",
+    capsize=4, color='skyblue', edgecolor='black'
+)
+plt.bar(
+    [s + width/2 for s in x], trial9_means, width, yerr=trial9_sems, label="Trial 9",
+    capsize=4, color='salmon', edgecolor='black'
+)
+
+plt.xticks(x, [f"Session {s}" for s in sessions])
+plt.xlabel("Session")
+plt.ylabel("Average Peak Height at Cue")
+plt.title("Cue-evoked Peak Height: Trial 0 vs Trial 9 by Session")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+#-------------------------------------------------------------------------------------------------------------
 
 results = []
 for (mouse, session, trial), (_, trace, _) in avglevertrace_dict.items():

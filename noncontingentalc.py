@@ -36,8 +36,8 @@ def identify_and_sort_lick_bouts(lick_timestamps, max_interval):
 
 
 #NONCONTINGENT
-folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHNoncontingent'
-mice = ['8730','8731','8732']
+folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHNonconting2'
+mice = ['8729', '8730', '8731','8732','8733','8742','8743','8747','8748','8750']
 
 
 files = os.listdir(folder)
@@ -122,16 +122,6 @@ for mouse in mice:
             if fp_df.iloc[i,0] == 'Timeout Press':
                 track_to.append(fp_df.iloc[i,1])
         
-        totallicks=[]
-        for i in range (len(track_licks)):
-            if len(track_cue) == 10:
-                totallicks.append(track_licks[i])
-            else:
-                if track_licks[i] < track_cue[10]:
-                    totallicks.append(track_licks[i])
-        lickspersession[mouse,Dates.index(date),i]= len(totallicks)
-        
-
         ########################## CUE ALIGNMENT ##########################    
 
         for i in range(len(track_cue)):
@@ -167,30 +157,6 @@ for mouse in mice:
         for index in firstlicks:
             track_flicks.append(track_licks[index])
 
-        for i in range(len(track_flicks)):
-            flick_zero = round(track_flicks[i] * fs)
-            flick_baseline = flick_zero + timerange_lick[0] * fs
-            flick_end = flick_zero + timerange_lick[1] * fs
-            
-            aligntobase = np.mean(df.iloc[flick_baseline:flick_zero,2])
-            rawtrial = np.array(df.iloc[flick_baseline:flick_end,2])
-
-            trial = []
-            for each in rawtrial:
-                trial.append((each-aligntobase)/np.std(df.iloc[cue_baseline:cue_zero,2]))
-                
-            
-            sampletrial=[]
-            for k in range(0, len(trial), N):
-                sampletrial.append(np.mean(trial[k:k+N-1]))
-            
-            for trial_num in range(len(track_cue)):
-                if track_flicks[i] - track_cue[trial_num] > 0 and track_flicks[i] - track_cue[trial_num] < 30:
-                    cue_trial = trial_num
-            avgflicktrace_dict[mouse,Dates.index(date),cue_trial]= track_flicks[i], sampletrial, aligntobase
-        
-        
-        ################## FIRST LICK ALIGNMENT WITH CUE BASELINE ################3
 
         for i in range(len(track_flicks)):
             for trial_num in range(len(track_cue)):
@@ -284,7 +250,7 @@ for mouse in mice:
 ############################################################################################################################
 ############################################################################################################################
 
-session_ranges = 3
+session_ranges = 1
 
 #by session average
 #colors10 = ['#8da0cb','#66c2a5','#a6d854','#ffd92f','#e78ac3','#e5c494','#bc80bd','#fc8d62']
@@ -322,7 +288,7 @@ plt.ylabel('z-score')
 plt.title('Average Cue Aligned Trace with SEM by Session')
 plt.legend()
 
-plt.savefig('/Users/kristineyoon/Documents/cuebysessions.pdf', transparent=True)
+# plt.savefig('/Users/kristineyoon/Documents/cuebysessions.pdf', transparent=True)
 plt.show()
 
 
