@@ -75,6 +75,10 @@ mice = ['7678', '7680', '7899','8733','8742','8743','8748','8747','8750']
 # mice = ['676', '679', '849', '873', '874', '917']
 
 
+
+# D2 MEDIUM SPINY NEURONS (ALCOHOL)
+folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHLearning/'
+mice = ['7098','7099','7107','7108','7296', '7310', '7311', '7319', '7321','8729','8730','8731','8732']
 files = os.listdir(folder)
 files.sort()
 print(files)
