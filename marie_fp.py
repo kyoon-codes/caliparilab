@@ -46,11 +46,11 @@ def identify_and_sort_lick_bouts(lick_timestamps, min_licks=3, start_interval=1.
 # folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/Last_EtOH_Binge/'
 # mice = ['A201', 'A204', 'A205', 'A207', 'A209', 'A212', 'A214', 'A215', 'A216', 'A402', 'A403', 'A404', 'A410']
 
-folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/Sacchrin/'
-mice = ['A201', 'A204', 'A205', 'A207', 'A209', 'A212', 'A214', 'A215', 'A216', 'A402', 'A403', 'A404', 'A409', 'A410', 'A414']
-
-# folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/STAR_0.25Q/'
+# folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/Sacchrin/'
 # mice = ['A201', 'A204', 'A205', 'A207', 'A209', 'A212', 'A214', 'A215', 'A216', 'A402', 'A403', 'A404', 'A409', 'A410', 'A414']
+
+folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/STAR_0.25Q/'
+mice = ['A201', 'A204', 'A205', 'A207', 'A209', 'A212', 'A214', 'A215', 'A216', 'A402', 'A403', 'A404', 'A409', 'A410', 'A414']
 
 # folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/Marie_EtOH_Data/STAR_1Q/'
 # mice = ['A201', 'A204', 'A205', 'A207', 'A212', 'A214', 'A215', 'A216', 'A402', 'A403', 'A404', 'A409', 'A410', 'A414']
@@ -721,11 +721,12 @@ fig.tight_layout()
 ### finding area under the curve
 # Calculates the area under the curve in that interval using Simpson's rule, which is generally accurate for oscillating data like neural traces.
 import numpy as np
-from scipy.integrate import simps
+from scipy.integrate import simpson
+# from scipy import integrate
 ############################################################################################################################
 # Define the interval of interest here
-start_time = -2
-end_time = 2
+start_time = 0
+end_time = 5
 
 
 auc_active_dict = {}
@@ -744,7 +745,7 @@ for mouse, press in activelever_dict:
         trace_segment = trace[start_index:end_index]
         
         # Calculate the area under the curve for the interval 0 to 1 second
-        area = simps(trace_segment, time_segment)
+        area = simpson(trace_segment, time_segment)
         
         auc_active_dict[mouse,press] = area
         count = len(auc_active_df)
@@ -783,33 +784,34 @@ auc_1LP_dict = {}
 auc_1LP_df = pd.DataFrame(columns=['Mouse','Group','Press', 'AUC'])
 for mouse, press in activelever_dict:
     if press % 5 == 1:
+        print(mouse, press)
         time = np.linspace(timerange[0], timerange[1], len(activelever_dict[mouse, press][1]))
         trace = activelever_dict[mouse, press][1]
-        
-        # Find the indices for the interval 0 to 1 second
-        start_index = np.searchsorted(time, start_time)
-        end_index = np.searchsorted(time, end_time)
-        
-        # Select the relevant portion of the trace
-        time_segment = time[start_index:end_index]
-        trace_segment = trace[start_index:end_index]
-        
-        # Calculate the area under the curve for the interval 0 to 1 second
-        area = simps(trace_segment, time_segment)
-        
-        auc_1LP_dict[mouse,press] = area
-        count = len(auc_1LP_df)
-        auc_1LP_df.at[count,'Mouse'] = mouse
-        auc_1LP_df.at[count,'Press'] = press
-        auc_1LP_df.at[count,'AUC'] = area
-        
-        if mouse in mice_high:
-            auc_1LP_df.at[count,'Group']='High'
-        elif mouse in mice_low:
-            auc_1LP_df.at[count,'Group']='Low'
-        elif mouse in mice_comp:
-            auc_1LP_df.at[count,'Group']='Compulsive'
-        
+        if len(trace) > 0:
+            # Find the indices for the interval 0 to 1 second
+            start_index = np.searchsorted(time, start_time)
+            end_index = np.searchsorted(time, end_time)
+            
+            # Select the relevant portion of the trace
+            time_segment = time[start_index:end_index]
+            trace_segment = trace[start_index:end_index]
+            
+            # Calculate the area under the curve for the interval 0 to 1 second
+            area = simpson(trace_segment, time_segment)
+            
+            auc_1LP_dict[mouse,press] = area
+            count = len(auc_1LP_df)
+            auc_1LP_df.at[count,'Mouse'] = mouse
+            auc_1LP_df.at[count,'Press'] = press
+            auc_1LP_df.at[count,'AUC'] = area
+            
+            if mouse in mice_high:
+                auc_1LP_df.at[count,'Group']='High'
+            elif mouse in mice_low:
+                auc_1LP_df.at[count,'Group']='Low'
+            elif mouse in mice_comp:
+                auc_1LP_df.at[count,'Group']='Compulsive'
+            
   
 auc_5LP_dict = {}
 auc_5LP_df = pd.DataFrame(columns=['Mouse','Group','Press', 'AUC'])
@@ -817,7 +819,38 @@ for mouse, press in activelever_dict:
     if press % 5 == 0:
         time = np.linspace(timerange[0], timerange[1], len(activelever_dict[mouse, press][1]))
         trace = activelever_dict[mouse, press][1]
-        
+        if len(trace) > 0:
+            # Find the indices for the interval 0 to 1 second
+            start_index = np.searchsorted(time, start_time)
+            end_index = np.searchsorted(time, end_time)
+            
+            # Select the relevant portion of the trace
+            time_segment = time[start_index:end_index]
+            trace_segment = trace[start_index:end_index]
+            
+            # Calculate the area under the curve for the interval 0 to 1 second
+            area = simpson(trace_segment, time_segment)
+            
+            auc_5LP_dict[mouse,press] = area
+            count = len(auc_5LP_df)
+            auc_5LP_df.at[count,'Mouse'] = mouse
+            auc_5LP_df.at[count,'Press'] = press
+            auc_5LP_df.at[count,'AUC'] = area
+            
+            if mouse in mice_high:
+                auc_5LP_df.at[count,'Group']='High'
+            elif mouse in mice_low:
+                auc_5LP_df.at[count,'Group']='Low'
+            elif mouse in mice_comp:
+                auc_5LP_df.at[count,'Group']='Compulsive'
+
+
+auc_lick_dict = {}
+auc_lick_df = pd.DataFrame(columns=['Mouse','Group','Bout', 'AUC'])
+for mouse, press in avglickbouttrace_dict:
+    time = np.linspace(timerange[0], timerange[1], len(avglickbouttrace_dict[mouse, press][2]))
+    trace = avglickbouttrace_dict[mouse, press][2]
+    if len(trace) > 0:
         # Find the indices for the interval 0 to 1 second
         start_index = np.searchsorted(time, start_time)
         end_index = np.searchsorted(time, end_time)
@@ -827,54 +860,23 @@ for mouse, press in activelever_dict:
         trace_segment = trace[start_index:end_index]
         
         # Calculate the area under the curve for the interval 0 to 1 second
-        area = simps(trace_segment, time_segment)
+        area = simpson(trace_segment, time_segment)
         
-        auc_5LP_dict[mouse,press] = area
-        count = len(auc_5LP_df)
-        auc_5LP_df.at[count,'Mouse'] = mouse
-        auc_5LP_df.at[count,'Press'] = press
-        auc_5LP_df.at[count,'AUC'] = area
+        auc_lick_dict[mouse,press] = area
+        count = len(auc_lick_df)
+        auc_lick_df.at[count,'Mouse'] = mouse
+        auc_lick_df.at[count,'Bout'] = avglickbouttrace_dict[mouse, press][1]
+        auc_lick_df.at[count,'AUC'] = area
         
         if mouse in mice_high:
-            auc_5LP_df.at[count,'Group']='High'
+            auc_lick_df.at[count,'Group']='High'
         elif mouse in mice_low:
-            auc_5LP_df.at[count,'Group']='Low'
+            auc_lick_df.at[count,'Group']='Low'
         elif mouse in mice_comp:
-            auc_5LP_df.at[count,'Group']='Compulsive'
-
-
-auc_lick_dict = {}
-auc_lick_df = pd.DataFrame(columns=['Mouse','Group','Bout', 'AUC'])
-for mouse, press in avglickbouttrace_dict:
-    time = np.linspace(timerange[0], timerange[1], len(avglickbouttrace_dict[mouse, press][2]))
-    trace = avglickbouttrace_dict[mouse, press][2]
-    
-    # Find the indices for the interval 0 to 1 second
-    start_index = np.searchsorted(time, start_time)
-    end_index = np.searchsorted(time, end_time)
-    
-    # Select the relevant portion of the trace
-    time_segment = time[start_index:end_index]
-    trace_segment = trace[start_index:end_index]
-    
-    # Calculate the area under the curve for the interval 0 to 1 second
-    area = simps(trace_segment, time_segment)
-    
-    auc_lick_dict[mouse,press] = area
-    count = len(auc_lick_df)
-    auc_lick_df.at[count,'Mouse'] = mouse
-    auc_lick_df.at[count,'Bout'] = avglickbouttrace_dict[mouse, press][1]
-    auc_lick_df.at[count,'AUC'] = area
-    
-    if mouse in mice_high:
-        auc_lick_df.at[count,'Group']='High'
-    elif mouse in mice_low:
-        auc_lick_df.at[count,'Group']='Low'
-    elif mouse in mice_comp:
-        auc_lick_df.at[count,'Group']='Compulsive'
-        
-        
-        
+            auc_lick_df.at[count,'Group']='Compulsive'
+            
+            
+            
         
 # import tdt
 # import os

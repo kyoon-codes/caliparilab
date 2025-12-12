@@ -10,7 +10,7 @@ from scipy.integrate import simpson
 
 #NONCONTINGENT
 folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHNonconting2'
-mice = ['8729', '8730', '8731','8732','8733','8742','8743','8747','8748','8750']
+mice = ['8729', '8730', '8731','8732'] #,'8733','8742','8743','8747','8748','8750']
 
 # -------------------------- PARAMETERS --------------------------
 events = ['Cue', 'Licks']
@@ -19,7 +19,7 @@ epocs = ['Po0_', 'Po4_']
 timerange_cue = [-2, 10]
 timerange_lick = [-5, 15]
 active_time = [-2,40]
-N = 50
+N = 100
 max_interval = 0.5  # Example max interval for lick bouts, adjust as needed
 
 # -------------------------- INIT STORAGE --------------------------
