@@ -9,17 +9,17 @@ from scipy.stats import sem, kruskal
 from scipy.integrate import simpson
 
 #NONCONTINGENT
-folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHNonconting2'
-mice = ['8729', '8730', '8731','8732'] #,'8733','8742','8743','8747','8748','8750']
+folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_FiberPhotometry/D2_EtOHNoncontingent3'
+mice = ['9299','9302','9325','9326','9327']#['8729', '8730', '8731','8732'] #,'8733','8742','8743','8747','8748','8750']
 
 # -------------------------- PARAMETERS --------------------------
 events = ['Cue', 'Licks']
 epocs = ['Po0_', 'Po4_']
 
 timerange_cue = [-2, 10]
-timerange_lick = [-5, 15]
+timerange_lick = [-5, 10]
 active_time = [-2,40]
-N = 100
+#N = 100
 max_interval = 0.5  # Example max interval for lick bouts, adjust as needed
 
 # -------------------------- INIT STORAGE --------------------------
@@ -53,6 +53,39 @@ def downsample_trial(trial, N):
     trim = len(trial) % N
     trial = trial[:len(trial)-trim] if trim != 0 else trial
     return trial.reshape(-1, N).mean(axis=1)
+
+
+import numpy as np
+from scipy.signal import butter, filtfilt
+
+def lowpass_filtfilt(data, fs, cutoff=2, order=4):
+    """
+    Zero-phase low-pass filter using filtfilt.
+
+    Parameters
+    ----------
+    data : array-like
+        1D signal to filter
+    fs : float
+        Sampling frequency (Hz)
+    cutoff : float
+        Low-pass cutoff frequency (Hz)
+    order : int
+        Butterworth filter order
+
+    Returns
+    -------
+    filtered_data : ndarray
+        Filtered signal
+    """
+
+    nyquist = fs / 2
+    normalized_cutoff = cutoff / nyquist
+
+    b, a = butter(order, normalized_cutoff, btype='low')
+    filtered_data = filtfilt(b, a, data)
+
+    return filtered_data
 
 def identify_firstlicks(track_lever, track_licks):
     firstlicks = []
@@ -99,10 +132,11 @@ for mouse in tqdm(mice, desc="Processing mice"):
         # ------------------- SIGNAL PROCESSING -------------------
         sig405 = data.streams._405B.data
         sig465 = data.streams._465B.data[:len(sig405)]
-        dff = (sig465 - sig405) / sig465
+        dff = (sig465 - sig405) # / sig465
         fs = round(data.streams._465B.fs)
-
-        df = pd.DataFrame({'Sig405': sig405, 'Sig465': sig465, 'Dff': dff})
+        filtered_trace = lowpass_filtfilt(dff, fs)
+       
+        df = pd.DataFrame({'Sig405': sig405, 'Sig465': sig465, 'Dff': dff, 'Filtered': filtered_trace})
 
         # ------------------- EXTRACT EVENTS -------------------
         fp_df = extract_events(data, events, epocs)
@@ -130,7 +164,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             cue_baselines.append((baseline_mean, baseline_std))
 
             trial_signal = (df['Dff'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            sampletrial = trial_signal
 
             all_cue_trials.append({
                 'Mouse': mouse,
@@ -159,7 +193,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             flick_end = flick_zero + timerange_lick[1] * fs
 
             trial_signal = (df['Dff'].iloc[flick_baseline:flick_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            sampletrial = trial_signal
 
             all_firstlick_trials.append({
                 'Mouse': mouse,
@@ -190,7 +224,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             lickb_end = lickb_zero + timerange_lick[1] * fs
 
             trial_signal = (df['Dff'].iloc[lickb_baseline:lickb_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            sampletrial = trial_signal
 
             all_lickbouts.append({
                 'Mouse': mouse,
@@ -211,7 +245,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             cue_baseline = cue_zero + active_time[0] * fs
             cue_end = cue_zero + active_time[1] * fs
             trial_signal = (df['Dff'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            sampletrial = trial_signal
 
             flick_times = track_flicks[(track_flicks - cue_time > 0) & (track_flicks - cue_time < 30)]
             flick_time = flick_times[0] if len(flick_times) > 0 else np.nan
@@ -270,7 +304,7 @@ def plot_traces_bysession(df, label,timerange, ylim, savepath):
     plt.show()
 
 plot_traces_bysession(avgcuetrace_df, 'Cue', timerange_cue, (-1,4), '/Users/kristineyoon/Documents/cuebysessions.pdf')
-plot_traces_bysession(avgflicktrace_df, 'First Lick', timerange_lick, (-5,9), '/Users/kristineyoon/Documents/firstlickbysessions.pdf')
+plot_traces_bysession(avgflicktrace_df, 'First Lick', timerange_lick , (-4,4), '/Users/kristineyoon/Documents/firstlickbysessions.pdf')
 
 
 # ------------------------- Finding Peak Height  -------------------------
@@ -310,6 +344,9 @@ def compute_peak_df(df, timerange, label):
 peak_cue_df = compute_peak_df(avgcuetrace_df, timerange_cue, "Cue")
 peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, "FirstLick")
 
+analysis_window = [-5, -3] 
+peak_flickbl_df = compute_peak_df(avgflicktrace_df, timerange_lick, "FirstLick")
+
 # Combine all
 peak_all_df = pd.concat([peak_cue_df, peak_flick_df], ignore_index=True)
 
@@ -342,6 +379,7 @@ def plot_peak_by_session(df, label, ylabel, ylim, savepath):
 
 plot_peak_by_session(peak_cue_df, 'Cue', 'Peak Height (z)', (-2, 8),'/Users/kristineyoon/Documents/peakheight_cue.pdf')
 plot_peak_by_session(peak_flick_df, 'First Lick', 'Peak Height (z)', (-2, 12),'/Users/kristineyoon/Documents/peakheight_firstlick.pdf')
+plot_peak_by_session(peak_flickbl_df, 'First Lick Basline', 'Peak Height (z)', (-2, 12),'/Users/kristineyoon/Documents/peakheight_firstlick.pdf')
 
 
 # ---------------------- Finding Area Under the Curve (AUC) ----------------------
@@ -400,9 +438,11 @@ def plot_auc(df, ylabel, ylim):
 # Compute AUC DataFrames
 auc_cue_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(0, 1))
 auc_flick_df = compute_auc(avgflicktrace_df, timerange_lick, interval=(0, 2))
+auc_flick1_df = compute_auc(avgflicktrace_df, timerange_lick, interval=(-5, -3))
 # Plot AUC for each type
 plot_auc(auc_cue_df, ylabel='Cue AUC', ylim=(-5,10))
 plot_auc(auc_flick_df, ylabel='First Lick AUC',ylim=(-5,20))
+plot_auc(auc_flick1_df, ylabel='First Lick Baseline AUC',ylim=(-5,20))
 
 
 # -------------------------------------------------------------

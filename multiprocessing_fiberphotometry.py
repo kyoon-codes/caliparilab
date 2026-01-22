@@ -14,17 +14,19 @@ folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_Fibe
 
 
 # ------- D2 MEDIUM SPINY NEURONS (ALCOHOL) -------
-mice = ['7098','7099','7107','7108','7296', '7310', '7311', '7319', '7321','8729','8730','8731','8732']
+mice = ['7098','7099','7107','7108', '7310', '7311', '7319', '7321','8729','8730','8731','8732','9299','9302','9325','9326','9327'] #'7296',
+# mice = ['9299','9302','9325','9326','9327']
 experiment = 'D2_EtOHLearning'
 # experiment = 'D2_1WeekWD'
 
-# mice = ['7098','7099','7108','7296', '7311', '7319', '7321','8729','8730','8731','8732']
+# mice = ['7098','7099','7108', '7311', '7319', '7321','8729','8730','8731','8732'] #'7296',
 # experiment = 'D2_EtOHExtinction'
 
 # ------- D2 MEDIUM SPINY NEURONS (SUCROSE) -------
 
+mice = ['7678', '7680', '8733','8742','8743','8747','8748','8750']
+experiment = 'D2_SucLearning'
 # mice = ['7678', '7680', '7899','8733','8742','8743','8747','8748','8750']
-# experiment = 'D2_SucLearning'
 # experiment = 'D2_SucExtinction'
 # experiment = 'D2_SuctoEtOH_EtOHLearning'
 # experiment = 'D2_SuctoEtOH_AlcExtinction'
@@ -38,28 +40,6 @@ experiment = 'D2_EtOHLearning'
 # experiment = 'D1_EtOHExtinction'
 # experiment = 'D1_SucLearning'
 # experiment = 'D1_SucExtinction'
-
-# -------------------------- PARAMETERS --------------------------
-events = ['Cue', 'Press', 'Licks', 'Timeout Press']
-epocs = ['Po0_', 'Po6_', 'Po4_', 'Po2_']
-
-timerange_cue = [-2, 10]
-timerange_lever = [-5, 5]
-timerange_lick = [-2, 15]
-active_time = [-2,40]
-N = 100
-max_interval = 0.5  # Example max interval for lick bouts, adjust as needed
-
-# -------------------------- INIT STORAGE --------------------------
-all_cue_trials = []
-all_lever_trials = []
-all_firstlick_trials = []
-all_firstlick_cue_aligned = []
-all_lickbouts = []
-all_trials = []
-lickspersession = []
-responsepersession = []
-timeoutpersession = []
 
 # -------------------------- HELPER FUNCTIONS --------------------------
 def extract_events(data, events, epocs):
@@ -77,11 +57,11 @@ def extract_events(data, events, epocs):
     else:
         return pd.DataFrame(columns=['Event','Timestamp'])
 
-def downsample_trial(trial, N):
-    trial = np.array(trial)
-    trim = len(trial) % N
-    trial = trial[:len(trial)-trim] if trim != 0 else trial
-    return trial.reshape(-1, N).mean(axis=1)
+# def downsample_trial(trial, N):
+#     trial = np.array(trial)
+#     trim = len(trial) % N
+#     trial = trial[:len(trial)-trim] if trim != 0 else trial
+#     return trial.reshape(-1, N).mean(axis=1)
 
 def identify_firstlicks(track_lever, track_licks):
     firstlicks = []
@@ -121,6 +101,61 @@ def identify_and_sort_lick_bouts(lick_timestamps, max_interval):
     sorted_bouts = sorted(bout_lengths, key=lambda x: x[0])
     return sorted_bouts
 
+import numpy as np
+from scipy.signal import butter, filtfilt
+
+def lowpass_filtfilt(data, fs, cutoff=3, order=4):
+    """
+    Zero-phase low-pass filter using filtfilt.
+
+    Parameters
+    ----------
+    data : array-like
+        1D signal to filter
+    fs : float
+        Sampling frequency (Hz)
+    cutoff : float
+        Low-pass cutoff frequency (Hz)
+    order : int
+        Butterworth filter order
+
+    Returns
+    -------
+    filtered_data : ndarray
+        Filtered signal
+    """
+
+    nyquist = fs / 2
+    normalized_cutoff = cutoff / nyquist
+
+    b, a = butter(order, normalized_cutoff, btype='low')
+    filtered_data = filtfilt(b, a, data)
+
+    return filtered_data
+
+# -------------------------- PARAMETERS --------------------------
+events = ['Cue', 'Press', 'Licks', 'Timeout Press']
+epocs = ['Po0_', 'Po6_', 'Po4_', 'Po2_']
+
+timerange_cue = [-2, 5]
+timerange_lever = [-2, 5]
+timerange_lick = [-2, 10]
+active_time = [-2,30]
+N = 100
+max_interval = 0.5  # Example max interval for lick bouts, adjust as needed
+
+# -------------------------- INIT STORAGE --------------------------
+all_cue_trials = []
+all_iti_trials = []
+all_lever_trials = []
+all_firstlick_trials = []
+all_firstlick_cue_aligned = []
+all_lickbouts = []
+all_trials = []
+lickspersession = []
+responsepersession = []
+timeoutpersession = []
+
 # -------------------------- MAIN LOOP --------------------------
 for mouse in tqdm(mice, desc="Processing mice"):
     mouse_dir = os.path.join(folder, experiment, mouse)
@@ -136,10 +171,11 @@ for mouse in tqdm(mice, desc="Processing mice"):
         # ------------------- SIGNAL PROCESSING -------------------
         sig405 = data.streams._405B.data
         sig465 = data.streams._465B.data[:len(sig405)]
-        dff = (sig465 - sig405) / sig465
+        dff = (sig465 - sig405) # / sig465
         fs = round(data.streams._465B.fs)
-
-        df = pd.DataFrame({'Sig405': sig405, 'Sig465': sig465, 'Dff': dff})
+        filtered_trace = lowpass_filtfilt(dff, fs)
+       
+        df = pd.DataFrame({'Sig405': sig405, 'Sig465': sig465, 'Dff': dff, 'Filtered': filtered_trace})
 
         # ------------------- EXTRACT EVENTS -------------------
         fp_df = extract_events(data, events, epocs)
@@ -148,6 +184,28 @@ for mouse in tqdm(mice, desc="Processing mice"):
         track_lever = fp_df.loc[fp_df['Event'] == 'Press', 'Timestamp'].to_numpy()
         track_licks = fp_df.loc[fp_df['Event'] == 'Licks', 'Timestamp'].to_numpy()
         track_to = fp_df.loc[fp_df['Event'] == 'Timeout Press', 'Timestamp'].to_numpy()
+        
+        # plt.figure(figsize=(16,6))
+        # plt.plot(dff)
+        # plt.eventplot(track_cue*fs, colors = 'gold')
+        # plt.eventplot(track_lever*fs, colors = 'blueviolet')
+        # plt.eventplot(track_licks*fs, colors = 'orchid')
+        # plt.eventplot(track_to*fs, colors = 'red')
+        # #plt.ylim(-2,2)
+        # plt.title(f'Mouse: {mouse} Date: {date}')
+        # plt.show()
+        
+
+        # filtered_trace = lowpass_filtfilt(dff, fs)
+        # plt.figure(figsize=(16,6))
+        # plt.plot(filtered_trace)
+        # plt.eventplot(track_cue*fs, colors = 'gold')
+        # plt.eventplot(track_lever*fs, colors = 'blueviolet')
+        # plt.eventplot(track_licks*fs, colors = 'orchid')
+        # plt.eventplot(track_to*fs, colors = 'red')
+        # #plt.ylim(-2,2)
+        # plt.title(f'Mouse: {mouse} Date: {date}')
+        # plt.show()
 
         # ------------------- SESSION COUNTS -------------------
         if len(track_cue) > 10:
@@ -171,19 +229,18 @@ for mouse in tqdm(mice, desc="Processing mice"):
             cue_baseline = cue_zero + timerange_cue[0] * fs
             cue_end = cue_zero + timerange_cue[1] * fs
 
-            baseline_mean = np.mean(df['Dff'].iloc[cue_baseline:cue_zero])
-            baseline_std = np.std(df['Dff'].iloc[cue_baseline:cue_zero])
+            baseline_mean = np.mean(df['Filtered'].iloc[cue_baseline:cue_zero])
+            baseline_std = np.std(df['Filtered'].iloc[cue_baseline:cue_zero])
             cue_baselines.append((baseline_mean, baseline_std))
 
-            trial_signal = (df['Dff'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            trial_signal = (df['Filtered'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
 
             all_cue_trials.append({
                 'Mouse': mouse,
                 'Session': session_idx,
                 'Trial': trial_num,
                 'CueTime': cue_time,
-                'Trace': sampletrial,
+                'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std
             })
@@ -200,15 +257,14 @@ for mouse in tqdm(mice, desc="Processing mice"):
             lever_zero = round(lever_time * fs)
             lever_baseline = lever_zero + timerange_lever[0] * fs
             lever_end = lever_zero + timerange_lever[1] * fs
-            trial_signal = (df['Dff'].iloc[lever_baseline:lever_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
-
+            trial_signal = (df['Filtered'].iloc[lever_baseline:lever_end] - baseline_mean) / baseline_std
+            
             all_lever_trials.append({
                 'Mouse': mouse,
                 'Session': session_idx,
                 'Trial': cue_trial,
                 'LeverTime': lever_time,
-                'Trace': sampletrial,
+                'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std
             })
@@ -229,15 +285,14 @@ for mouse in tqdm(mice, desc="Processing mice"):
             flick_baseline = flick_zero + timerange_lick[0] * fs
             flick_end = flick_zero + timerange_lick[1] * fs
 
-            trial_signal = (df['Dff'].iloc[flick_baseline:flick_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
-
+            trial_signal = (df['Filtered'].iloc[flick_baseline:flick_end] - baseline_mean) / baseline_std
+            
             all_firstlick_trials.append({
                 'Mouse': mouse,
                 'Session': session_idx,
                 'Trial': cue_trial,
                 'FlickTime': flick_time,
-                'Trace': sampletrial,
+                'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std,
                 'Licks': licks[i]
@@ -264,8 +319,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             # baseline_mean = np.mean(df['Dff'].iloc[lickb_baseline:lickb_zero])
             # baseline_std = np.std(df['Dff'].iloc[lickb_baseline:lickb_zero])
 
-            trial_signal = (df['Dff'].iloc[lickb_baseline:lickb_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            trial_signal = (df['Filtered'].iloc[lickb_baseline:lickb_end] - baseline_mean) / baseline_std
 
             all_lickbouts.append({
                 'Mouse': mouse,
@@ -273,20 +327,24 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'Trial': cue_trial,
                 'BoutLength': bout_len,
                 'StartTime': start_time,
-                'Trace': sampletrial,
+                'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std
             })
 
         # ------------------- ALL TRIAL ALIGNMENT -------------------
         for trial_num, cue_time in enumerate(track_cue):
-            baseline_mean, baseline_std = cue_baselines[trial_num]
+            #baseline_mean, baseline_std = cue_baselines[trial_num]
 
             cue_zero = round(cue_time * fs)
             cue_baseline = cue_zero + active_time[0] * fs
             cue_end = cue_zero + active_time[1] * fs
-            trial_signal = (df['Dff'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
-            sampletrial = downsample_trial(trial_signal, N)
+            
+            baseline_mean = np.mean(df['Filtered'].iloc[cue_baseline:cue_end])
+            baseline_std = np.std(df['Filtered'].iloc[cue_baseline:cue_end])
+            
+            trial_signal = (df['Filtered'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
+
 
             lever_times = track_lever[(track_lever - cue_time > 0) & (track_lever - cue_time < 20)]
             lever_time = lever_times[0] if len(lever_times) > 0 else np.nan
@@ -301,20 +359,79 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'CueTime': cue_time,
                 'LeverTime': lever_time,
                 'FlickTime': flick_time,
-                'Trace': sampletrial,
+                'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
-                'BaselineStd': baseline_std
+                'BaselineStd': baseline_std,
+                'Latency': flick_time-cue_time
             })
+        # ------------------- ITI ALIGNMENT -------------------
+        timerange_iti = [-40,-10]
+        for trial_num, cue_time in enumerate(track_cue):
+            if trial_num > 0:
+                #baseline_mean, baseline_std = cue_baselines[trial_num-1]
+                cue_zero = round(cue_time * fs)
+                cue_baseline = cue_zero + timerange_iti[0] * fs
+                cue_end = cue_zero + timerange_iti[1] * fs
+                baseline_mean = np.mean(df['Filtered'].iloc[cue_baseline:cue_end])
+                baseline_std = np.std(df['Filtered'].iloc[cue_baseline:cue_end])
+                trial_signal = (df['Filtered'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
 
+                find_to = track_to*fs
+                trial_to = []
+                
+                for tos in find_to:
+                    if cue_baseline <= tos <= cue_end:
+                        trial_to.append((tos-cue_baseline)/fs)
+                
+    
+                all_iti_trials.append({
+                    'Mouse': mouse,
+                    'Session': session_idx,
+                    'Trial': trial_num,
+                    'CueTime': cue_time,
+                    'Trace': trial_signal,
+                    'TimeOuts': trial_to,
+                    'TimeoutLength': len(trial_to)
+                })
 # -------------------------- CONVERT TO DATAFRAMES --------------------------
 avgcuetrace_df = pd.DataFrame(all_cue_trials)
 avglevertrace_df = pd.DataFrame(all_lever_trials)
 avgflicktrace_df = pd.DataFrame(all_firstlick_trials)
 avglickbouttrace_df = pd.DataFrame(all_lickbouts)
 alltrialtrace_df = pd.DataFrame(all_trials)
+allititrace_df = pd.DataFrame(all_iti_trials)
 
 
-# ---------- by response at the trial
+# ------------------------- Plotting Cue Trace By Individual Trials -------------------------
+colors = sns.color_palette("husl", 10)
+timerange = [-2,5]
+session_list = [0]
+plt.figure(figsize=(7, 8))
+for session in session_list:
+    traces = np.stack(avgcuetrace_df.loc[avgcuetrace_df['Session']==session, 'Trace'])
+    time = np.linspace(timerange[0], timerange[1], len(traces[0]))
+
+    start_idx = np.searchsorted(time, timerange[0])
+    end_idx = np.searchsorted(time, timerange[1])
+    timesegment = time[start_idx:end_idx]
+    # mean_trace = traces.mean(axis=0)
+    # sem_trace = sem(traces)
+    for k in range(len(traces)):
+        plt.plot(traces[k], color=colors[session % len(colors)], label=f'Session {session}', alpha = 0.2)
+
+plt.xlabel('Time (samples)')
+plt.xlim(start_idx,end_idx)
+plt.xticks(np.arange(0, len(timesegment)+1,
+                     len(timesegment)/(timerange[1]-timerange[0])),
+           np.arange(timerange[0], timerange[1]+1, 1, dtype=int))
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(timesegment)/(timerange[1]-timerange[0])*(0-timerange[0]),
+            linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.tight_layout()
+plt.show()
+
+# -------------------------- by response at the trial --------------------------
 responsetrials = []
 noresponsetrials = []
 for _, row in avgcuetrace_df.iterrows():
@@ -322,16 +439,10 @@ for _, row in avgcuetrace_df.iterrows():
     
     # Check for matching row in avgflicktrace_df
     matching_row = avgflicktrace_df[
-        (avgflicktrace_df["Mouse"] == mouse) & 
-        (avgflicktrace_df["Session"] == session) & 
-        (avgflicktrace_df["Trial"] == trial)
-    ]
+        (avgflicktrace_df["Mouse"] == mouse) & (avgflicktrace_df["Session"] == session) & (avgflicktrace_df["Trial"] == trial)]
     
     if not matching_row.empty:
-        responsetrials.append({'Mouse': mouse, 
-                              'Session': session, 
-                              'Trial': trial,
-                              'Trace': trace})
+        responsetrials.append({'Mouse': mouse,'Session': session, 'Trial': trial, 'Trace': trace})
     else:
         noresponsetrials.append({'Mouse': mouse, 
                                'Session': session, 
@@ -341,64 +452,49 @@ for _, row in avgcuetrace_df.iterrows():
 avgcuebyresponsetrace_df = pd.DataFrame(responsetrials)
 avgcuebynoresponsetrace_df= pd.DataFrame(noresponsetrials)
 
-# ---------- by response at the previous trial
-previouslick = []
-previousnolick = []
-for _, row in avgcuetrace_df.iterrows():
-    mouse, session, trial, trace = row["Mouse"], row["Session"], row["Trial"], row['Trace']
-    
-    # Check for matching row in avgflicktrace_df
-    matching_row = avgflicktrace_df[
-        (avgflicktrace_df["Mouse"] == mouse) & 
-        (avgflicktrace_df["Session"] == session) & 
-        (avgflicktrace_df["Trial"] == trial-1)
-    ]
-    
-    if not matching_row.empty:
-        previouslick.append({'Mouse': mouse, 
-                              'Session': session, 
-                              'Trial': trial,
-                              'Trace': trace})
-    else:
-        previousnolick.append({'Mouse': mouse, 
-                               'Session': session, 
-                               'Trial': trial,
-                               'Trace': trace})
-        
-avgcuebyprevlicketrace_df = pd.DataFrame(previouslick)
-avgcuebynoprevlicktrace_df= pd.DataFrame(previousnolick)
+# ------------------------- Plotting Cue Trace By Individual Trials -------------------------
+
+df_of_interest = avgcuebyresponsetrace_df
+colors = sns.color_palette("husl", 10)
+timerange = [-2,5]
+session_list = [3,7]
+plt.figure(figsize=(7, 8))
+for session in session_list:
+    traces = np.stack(df_of_interest.loc[df_of_interest['Session']==session, 'Trace'])
+    time = np.linspace(timerange[0], timerange[1], len(traces[0]))
+
+    start_idx = np.searchsorted(time, timerange[0])
+    end_idx = np.searchsorted(time, timerange[1])
+    timesegment = time[start_idx:end_idx]
+    # mean_trace = traces.mean(axis=0)
+    # sem_trace = sem(traces)
+    for k in range(len(traces)):
+        plt.plot(traces[k], color=colors[session % len(colors)], label=f'Session {session}', alpha = 0.2)
+
+plt.xlabel('Time (samples)')
+plt.xlim(start_idx,end_idx)
+plt.xticks(np.arange(0, len(timesegment)+1,
+                     len(timesegment)/(timerange[1]-timerange[0])),
+           np.arange(timerange[0], timerange[1]+1, 1, dtype=int))
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=len(timesegment)/(timerange[1]-timerange[0])*(0-timerange[0]),
+            linewidth=1, color='black')
+plt.ylabel('z-score')
+plt.tight_layout()
+plt.title(f'{df_of_interest}')
+plt.show()
+
 
 # -------------------------- BEHAVIORAL DATA --------------------------
 
+alltrialtrace_df['LeverLate'] = alltrialtrace_df['LeverTime'] - alltrialtrace_df['CueTime']
+leverlatency_matrix_df = alltrialtrace_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="LeverLate", aggfunc="first") 
+alltrialtrace_df['LickLate'] = alltrialtrace_df['FlickTime'] - alltrialtrace_df['LeverTime']
+licklatency_matrix_df = alltrialtrace_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="LickLate", aggfunc="first") 
 behavioral_licks_df = pd.DataFrame(lickspersession)
 behavioral_response_df = pd.DataFrame(responsepersession)
 behavioral_timeout_df = pd.DataFrame(timeoutpersession)
 
-latency = []
-for _, row in alltrialtrace_df.iterrows():
-    cue_time = row['CueTime']
-    lever_time = row['LeverTime']
-    lick_time = row['FlickTime']
-    
-    if not np.isnan(lever_time):
-        topress = lever_time - cue_time
-    else:
-        topress = np.nan
-    
-    if not np.isnan(lick_time):
-        tolick = lick_time - lever_time
-    else:
-        tolick = np.nan
-        
-    latency.append({
-        'Mouse': row['Mouse'],
-        'Session': row['Session'],
-        'Trial': row['Trial'],
-        'LatencytoPress': topress,
-        'LatencytoLick': tolick
-    })
-
-behavioral_latency = pd.DataFrame(latency)
 # ----------------------------------------------------------------------------
 # ------------------------- NOW THE FUN STUFF!!!!!!! -------------------------
 # ----------------------------------------------------------------------------
@@ -407,11 +503,81 @@ behavioral_latency = pd.DataFrame(latency)
 colors = sns.color_palette("husl", 10)
 colors10 = sns.color_palette("husl", 10)
 
+# ------------------------- PLOTTING HEATMAPS OF FULL TRIALS -------------------------
+cmapcolor = 'vlag' #sns.diverging_palette(250, 30, l=60, as_cmap=True)
+
+# ---- INTERTRIAL INTERVALS SORTED BY LATENCY TO PRESS DURING TIME OUT ----
+session_list = [0]
+
+fig, axs = plt.subplots(1, 2, figsize=(10, 8))
+timerange_iti_new = [0,timerange_iti[1]-timerange_iti[0]]
+for ax_i, session in enumerate(session_list):
+    
+    session_df = allititrace_df.loc[allititrace_df['Session'] == session].copy()
+    
+    sorted_session_df = session_df.sort_values("TimeoutLength")
+    traces = np.vstack(sorted_session_df["Trace"].values)
+    n_trials, n_timepoints = traces.shape
+    time = np.linspace(timerange_iti_new[0], timerange_iti_new[1], n_timepoints)
+
+    ax = axs[ax_i]
+    sns.heatmap(traces, cmap=cmapcolor, vmin=-4, vmax=4, cbar=True, ax=ax)
+    ax.set_xticks(np.arange(0, len(time)+1, 2*len(time)/(timerange_iti_new[1]-timerange_iti_new[0])),
+        np.arange(timerange_iti_new[0], timerange_iti_new[1]+1, 2, dtype=int))
+
+    # Convert each timeout time → heatmap x index
+    def convert_list_to_xcoords(timeout_list):
+        return [(t - timerange_iti_new[0]) / (timerange_iti_new[1] - timerange_iti_new[0]) * n_timepoints for t in timeout_list]
+
+    events = sorted_session_df["TimeOuts"].apply(convert_list_to_xcoords).tolist()
+    ax.eventplot(events,colors='black',lineoffsets=np.arange(n_trials) + 0.5,linelengths=0.8,linewidths=1)
+    ax.set_title(f"Session {session}")
+
+plt.xlabel("Time (sec)")
+plt.tight_layout()
+plt.savefig('/Users/kristineyoon/Documents/fullititraceheatmap_bylatency.pdf', transparent=True)
+plt.show()
+
+# ---- ACTIVE TRIALS SORTED BY LATENCY TO LICK ----
+fig, axs = plt.subplots(1, 2, figsize=(10, 8))
+
+for ax_i, session in enumerate(session_list):
+    session_df = alltrialtrace_df.loc[alltrialtrace_df['Session'] == session]
+    session_sorted_df = session_df.sort_values(by='Latency')
+    traces = np.vstack(session_sorted_df['Trace'])
+    latency_values = session_sorted_df['Latency'].values  # shape (n_trials,)
+    n_trials, n_timepoints = traces.shape
+
+    time = np.linspace(active_time[0], active_time[1], n_timepoints)
+
+    # --- HEATMAP ---
+    sns.heatmap(traces, cmap=cmapcolor, vmin=-4, vmax=4, cbar=True, ax=axs[ax_i])
+    ax = axs[ax_i]
+    ax.set_xticks(np.arange(0, n_timepoints + 1, 2 * n_timepoints / (active_time[1] - active_time[0])), np.arange(active_time[0], active_time[1] + 1, 2, dtype=int))
+    ax.axvline(x=n_timepoints * (0 - active_time[0]) / (active_time[1] - active_time[0]),linewidth=1, color='black')
+
+    # --- EVENTPLOT OVERLAY ---
+    # Convert latencies (sec) → column positions (indices)
+    latency_x = (latency_values - active_time[0]) / (active_time[1] - active_time[0]) * n_timepoints
+
+    events = [[x] for x in latency_x]
+    ax.eventplot(events,colors='black',lineoffsets=np.arange(n_trials) + 0.5, linelengths=0.9, linewidths=1)
+    ax.set_title(f"Session {session}")
+
+plt.xlabel('Time (sec)')
+plt.ylabel('Trials')
+plt.tight_layout()
+plt.savefig('/Users/kristineyoon/Documents/fulltraceheatmap_bylatency.pdf', transparent=True)
+plt.show()
+
+
+
+
 # ------------------------- Plotting Traces -------------------------
 
 def plot_traces_bysession(df, label,ogtime, timerange, ylim, savepath):
     session_list = sorted(df['Session'].unique())
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(timerange[1]-timerange[0], 8))
     for i, session in enumerate(session_list):
         traces = np.stack(df.loc[df['Session']==session, 'Trace'])
         time = np.linspace(ogtime[0], ogtime[1], len(traces[0]))
@@ -444,26 +610,20 @@ def plot_traces_bysession(df, label,ogtime, timerange, ylim, savepath):
     plt.show()
 
 
-plot_traces_bysession(avgcuetrace_df, 'Cue', timerange_cue, [-2,10], (-1,5), f'/Users/kristineyoon/Documents/{experiment}_cuebysessions.pdf')
-plot_traces_bysession(avglevertrace_df, 'Lever', timerange_lever,timerange_lever, (-4,10), f'/Users/kristineyoon/Documents/{experiment}_leverbysessions.pdf')
-plot_traces_bysession(avgflicktrace_df, 'First Lick', timerange_lick, [-2,10], (-2,6), f'/Users/kristineyoon/Documents/{experiment}_firstlickbysessions.pdf')
+plot_traces_bysession(avgcuetrace_df, 'Cue', timerange_cue, [-2,5], (-6,8), f'/Users/kristineyoon/Documents/{experiment}_cuebysessions.pdf')
+plot_traces_bysession(avglevertrace_df, 'Lever', timerange_lever,timerange_lever, (-6,8), f'/Users/kristineyoon/Documents/{experiment}_leverbysessions.pdf')
+plot_traces_bysession(avgflicktrace_df, 'First Lick', timerange_lick, [-2,10], (-6,8), f'/Users/kristineyoon/Documents/{experiment}_firstlickbysessions.pdf')
 
 # # ---- by response ----
 plot_traces_bysession(avgcuebyresponsetrace_df, 'Response Cue', timerange_cue, [-2,10], (-2,4), f'/Users/kristineyoon/Documents/{experiment}_cuebyresponse.pdf')
 plot_traces_bysession(avgcuebynoresponsetrace_df, 'No Response Cue', timerange_cue, [-2,10], (-2,4), f'/Users/kristineyoon/Documents/{experiment}_cuebynoresponse.pdf')
-# plot_traces_bysession(avgcuebyprevlicketrace_df, 'Previous Lick Cue', timerange_cue, [-2,10], (-2,8), f'/Users/kristineyoon/Documents/{experiment}_cuebyprevlick.pdf')
-# plot_traces_bysession(avgcuebynoprevlicktrace_df, 'No Previous Lick Cue', timerange_cue, [-2,10], (-2,8), f'/Users/kristineyoon/Documents/{experiment}_cuebynoprevlick.pdf')
-
 
 
 # ------------------------- Finding Peak Height  -------------------------
 
-analysis_window = [0,2]  # time window in seconds
-# analysis_window = [0,2]
 totalsessions = len(sorted(avgcuetrace_df['Session'].unique()))
 
-
-def compute_peak_df(df, timerange, label):
+def compute_peak_df(df, timerange, analysis_window, label):
     """Compute peak height in 0–2 s window for traces in df."""
     results = []
 
@@ -490,20 +650,150 @@ def compute_peak_df(df, timerange, label):
             "PeakTime": peak_time})
     return pd.DataFrame(results)
 
+peak_cue_df = compute_peak_df(avgcuetrace_df, timerange_cue, [0,1], "Cue")
+peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
 
-peak_cue_df = compute_peak_df(avgcuetrace_df, timerange_cue, "Cue")
-peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, "Lever")
-peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, "FirstLick")
 
-# Combine all
-peak_all_df = pd.concat([peak_cue_df, peak_lever_df, peak_flick_df], ignore_index=True)
 
-peak_cue_response_df = compute_peak_df(avgcuebyresponsetrace_df, timerange_cue, "Cue")
-peak_cue_noresponse_df = compute_peak_df(avgcuebynoresponsetrace_df, timerange_cue, "Cue")
+# # ------------------------- Finding Peak Height Using SCIPY FIND PEAKS  -------------------------
+# import numpy as np
+# import pandas as pd
+# from scipy.signal import find_peaks
+
+# def compute_peak_df(df, timerange, analysis_window, label, min_height=None, min_prominence=None):
+#     results = []
+
+#     for _, row in df.iterrows():
+#         mouse   = row["Mouse"]
+#         session = row["Session"]
+#         trial   = row["Trial"]
+#         trace   = row["Trace"]
+#         time = np.linspace(timerange[0], timerange[1], len(trace))
+
+#         start_idx = np.searchsorted(time, analysis_window[0])
+#         end_idx   = np.searchsorted(time, analysis_window[1])
+#         trace_segment = trace[start_idx:end_idx].reset_index(drop=True)
+#         time_segment  = time[start_idx:end_idx]
+#         peaks, properties = find_peaks(trace_segment, height=min_height, prominence=min_prominence)
+
+#         if len(peaks) == 0:
+#             peakheight = np.nan
+#             peak_time  = np.nan
+#         else:
+#             # take the largest peak
+#             peak_idx = peaks[np.argmax(properties["prominences"])]
+#             peakheight = trace_segment[peak_idx]
+#             peak_time  = time_segment[peak_idx]
+#         results.append({"Alignment": label, "Mouse": mouse, "Session": session, "Trial": trial, "PeakHeight": peakheight, "PeakTime": peak_time})
+#     return pd.DataFrame(results)
+
+# # ------------------------- LOOKING AT PEAK HEIGHT -------------------------
+# peak_cue_df = compute_peak_df(df = avgcuetrace_df, timerange = timerange_cue, analysis_window=[0,2], label="Cue", min_height=-5, min_prominence=0.1)                                                
+# peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+# peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-0.5,0.5], "Lever", min_height=-5, min_prominence=0.2)                   
+# peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+# peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,2], "FirstLick", min_height=-5, min_prominence=0.2)                   
+# peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+
+
+# ------------------------- Running Nested Statistics on Cue -------------------------
+from scipy.stats import ttest_rel
+import statsmodels.formula.api as smf
+import itertools
+from scipy.stats import ttest_rel
+from scipy.stats import chi2
+
+sessions_of_interest = [3,7]
+
+# Average across trials within mouse
+mouse_means = (peak_cue_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
+mouse_means_clean = mouse_means.dropna()
+t_stat, p_val = ttest_rel(mouse_means_clean[sessions_of_interest[0]],mouse_means_clean[sessions_of_interest[1]])
+print(f"Nested paired t-test (Session {sessions_of_interest[0]} vs {sessions_of_interest[1]})")
+print(f"n mice = {len(mouse_means_clean)}")
+print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
+
+# ------------------------- Plotting Cue Trace By Individual Trials -------------------------
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import sem
+
+colors = sns.color_palette("husl", 10)
+timerange = [-2, 6]
+session_list = [2,6]
+
+plt.figure(figsize=(7, 8))
+
+for session in session_list:
+    # Get all traces for this session
+    traces = np.stack(avgcuetrace_df.loc[avgcuetrace_df['Session']==session, 'Trace'])
+    # Get corresponding peak heights and times
+    peakheights = peak_cue_df.loc[peak_cue_df['Session']==session, 'PeakHeight'].values
+    peaktime = peak_cue_df.loc[peak_cue_df['Session']==session, 'PeakTime'].values
+
+    time = np.linspace(timerange[0], timerange[1], traces.shape[1])
+
+    for k in range(len(traces)):
+        # Plot trace
+        plt.plot(time, traces[k], color=colors[session % len(colors)], alpha=0.2)
+
+        # Plot peak
+        if not np.isnan(peakheights[k]):
+            plt.scatter(peaktime[k], peakheights[k],
+                        color=colors[session % len(colors)],
+                        alpha=0.6)
+
+plt.xlabel('Time (s)')
+plt.ylabel('z-score')
+plt.axhline(y=0, linestyle=':', color='black')
+plt.axvline(x=0, linestyle=':', color='black')  # alignment point
+plt.xlim(timerange)
+plt.tight_layout()
+plt.show()
+
+
+# ------------------------- LOOKING AT LEVER AND FIRST LICK PEAK HEIGHT -------------------------
+peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-0.5,0.5], "Lever")                   
+peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,1], "FirstLick")                   
+peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+
+sessions_of_interest = [2, 5]
+# Average across trials within mouse
+mouse_means = (peak_cue_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
+mouse_means_clean = mouse_means.dropna()
+t_stat, p_val = ttest_rel(mouse_means_clean[sessions_of_interest[0]],mouse_means_clean[sessions_of_interest[1]])
+print('----Looking at Cue Peak Height----')
+print(f"Nested paired t-test (Session {sessions_of_interest[0]} vs {sessions_of_interest[1]})")
+print(f"n mice = {len(mouse_means_clean)}")
+print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
+print('------------------------------------')
+
+# Average across trials within mouse
+mouse_means = (peak_lever_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
+mouse_means_clean = mouse_means.dropna()
+t_stat, p_val = ttest_rel(mouse_means_clean[sessions_of_interest[0]],mouse_means_clean[sessions_of_interest[1]])
+print('----Looking at Lever Peak Height----')
+print(f"Nested paired t-test (Session {sessions_of_interest[0]} vs {sessions_of_interest[1]})")
+print(f"n mice = {len(mouse_means_clean)}")
+print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
+print('------------------------------------')
+
+# Average across trials within mouse
+mouse_means = (peak_flick_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
+mouse_means_clean = mouse_means.dropna()
+t_stat, p_val = ttest_rel(mouse_means_clean[sessions_of_interest[0]],mouse_means_clean[sessions_of_interest[1]])
+print('----Looking at First Lick Peak Height----')
+print(f"Nested paired t-test (Session {sessions_of_interest[0]} vs {sessions_of_interest[1]})")
+print(f"n mice = {len(mouse_means_clean)}")
+print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
+print('------------------------------------')
+
 
 # ---------------------- Plotting Peak Height ----------------------
 
-def plot_peak_by_session(df, label, ylabel, ylim): #, savepath):
+def plot_peak_by_session(df, label, ylabel, ylim, analysis_window): #, savepath):
     session_list = sorted(df['Session'].unique())
     plt.figure(figsize=(5,6))
 
@@ -527,12 +817,13 @@ def plot_peak_by_session(df, label, ylabel, ylim): #, savepath):
     # plt.savefig(savepath, transparent=True)
     plt.show()
 
-plot_peak_by_session(peak_cue_df, 'Cue', 'Peak Height (z)', (-2, 8)) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
-plot_peak_by_session(peak_lever_df, 'Lever', 'Peak Height (z)', (-2, 10)) # ,'/Users/kristineyoon/Documents/peakheight_lever.pdf')
-plot_peak_by_session(peak_flick_df, 'First Lick', 'Peak Height (z)', (-4, 10)) # ,'/Users/kristineyoon/Documents/peakheight_firstlick.pdf')
+plot_peak_by_session(peak_cue_df, 'Cue', 'Peak Height (z)', (-2, 8),[0,1]) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
+plot_peak_by_session(peak_lever_df, 'Lever', 'Peak Height (z)', (-2, 10),[-0.5,0.5]) # ,'/Users/kristineyoon/Documents/peakheight_lever.pdf')
+plot_peak_by_session(peak_flick_df, 'First Lick', 'Peak Height (z)', (-4, 10),[0,1]) # ,'/Users/kristineyoon/Documents/peakheight_firstlick.pdf')
 
-plot_peak_by_session(peak_cue_response_df, 'Response Cue', 'Peak Height (z)', (-2, 8)) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
-plot_peak_by_session(peak_cue_noresponse_df, 'No REsponse Cue', 'Peak Height (z)', (-2, 8)) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
+
+# plot_peak_by_session(peak_cue_response_df, 'Response Cue', 'Peak Height (z)', (-2, 8)) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
+# plot_peak_by_session(peak_cue_noresponse_df, 'No REsponse Cue', 'Peak Height (z)', (-2, 8)) # ,'/Users/kristineyoon/Documents/peakheight_cue.pdf')
 
 
 # ---------------------- Finding Area Under the Curve (AUC) ----------------------
@@ -591,11 +882,15 @@ def plot_auc(df, ylabel, ylim):
 
 # Compute AUC DataFrames
 auc_cue_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(0, 2))
+auc_cue_matrix_df = auc_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+
 auc_lever_df = compute_auc(avglevertrace_df, timerange_lever, interval=(-1, 1))
 auc_flick_df = compute_auc(avgflicktrace_df, timerange_lick, interval=(0, 2))
+auc_lever_matrix_df = auc_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+auc_flick_matrix_df = auc_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
 
-auc_responsecue_df = compute_auc(avgcuebyresponsetrace_df, timerange_cue, interval=(0, 2))
-auc_noresponsecue_df = compute_auc(avgcuebynoresponsetrace_df, timerange_cue, interval=(0, 2))
+# auc_responsecue_df = compute_auc(avgcuebyresponsetrace_df, timerange_cue, interval=(0, 2))
+# auc_noresponsecue_df = compute_auc(avgcuebynoresponsetrace_df, timerange_cue, interval=(0, 2))
 
 
 # Plot AUC for each type
@@ -603,6 +898,44 @@ plot_auc(auc_cue_df, ylabel='Cue AUC', ylim=(-5,10))
 plot_auc(auc_lever_df, ylabel='Lever AUC', ylim=(-5,10))
 plot_auc(auc_flick_df, ylabel='First Lick AUC',ylim=(-5,20))
 
+
+from scipy.stats import ttest_rel
+import statsmodels.formula.api as smf
+import itertools
+from scipy.stats import ttest_rel
+from scipy.stats import chi2
+
+
+# Extract sessions of interest
+sessions_of_interest = [3, 7]
+
+# Average across trials within mouse
+mouse_means = (auc_cue_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
+mouse_means_clean = mouse_means.dropna()
+t_stat, p_val = ttest_rel(mouse_means_clean[3],mouse_means_clean[7])
+print(f"Nested paired t-test (Session 3 vs 7)")
+print(f"n mice = {len(mouse_means_clean)}")
+print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
+
+
+df_sub = auc_cue_df.loc[auc_cue_df["Session"].isin([0, 3, 7])].copy()
+df_sub["Session"] = df_sub["Session"].astype("category")
+model = smf.mixedlm("AUC ~ C(Session)", df_sub, groups=df_sub["Mouse"])
+result = model.fit()
+print(result.summary())
+
+# Null model: no Session effect
+null_model = smf.mixedlm("AUC ~ 1", df_sub, groups=df_sub["Mouse"]).fit()
+lr_stat = 2 * (result.llf - null_model.llf)
+p_lr = chi2.sf(lr_stat, df=2)  # 3 levels → 2 df
+print(f"Nested one-way ANOVA (Session 0,3,7): "f"χ²(2) = {lr_stat:.3f}, p = {p_lr:.4g}")
+
+mouse_means = (df_sub.groupby(["Mouse", "Session"])["AUC"].mean().unstack())
+pairs = [(0, 3), (0, 7), (3, 7)]
+for s1, s2 in pairs:
+    data = mouse_means[[s1, s2]].dropna()
+    t, p = ttest_rel(data[s1], data[s2])
+    print(f"Session {s1} vs {s2}: t = {t:.3f}, p = {p:.4g}")
 
 
 # ---------------------- Categorizing Lick Bouts ---------------------- 
@@ -868,24 +1201,38 @@ plt.show()
 # plt.show()
 
 
+from scipy.stats import sem
+plt.figure(figsize=(5, 6))
+df7 = peak_cue_df.loc[peak_cue_df["Session"] == 7]
+df3 = peak_cue_df.loc[peak_cue_df["Session"] == 3]
 
-plt.figure(figsize=(5,6))
-df = peak_cue_df.loc[peak_cue_df["Session"] == 7]
 for trial in range(10):
-    trial_data = df.loc[df['Trial'] == trial, "PeakHeight"]
+    trial_data7 = df7.loc[df7['Trial'] == trial, "PeakHeight"]
+    trial_data3 = df3.loc[df3['Trial'] == trial, "PeakHeight"]
 
-    if not trial_data.empty:
-        plt.scatter([trial]*len(trial_data), trial_data,
-                    color=colors[i % len(colors)], alpha=0.05)
-        mean_val = trial_data.mean()
-        err_val = sem(trial_data)
-        plt.scatter(trial, mean_val, color=colors[i % len(colors)], s=40, label=f'Session {session}')
-        plt.errorbar(trial, mean_val, yerr=err_val,
-                     ecolor=colors[i % len(colors)], capsize=3)
+    # ---- Session 7 ----
+    if not trial_data7.empty:
+        plt.scatter([trial] * len(trial_data7),trial_data7, color=colors[7 % len(colors)], alpha=0.05)
+        mean_val = trial_data7.mean()
+        err_val = sem(trial_data7)
+
+        plt.scatter(trial, mean_val, color=colors[7 % len(colors)], s=40, label='Session 7' if trial == 0 else None)
+        plt.errorbar(trial, mean_val, yerr=err_val, ecolor=colors[7 % len(colors)], capsize=3)
+
+
+    # ---- Session 3 ----
+    if not trial_data3.empty:
+        plt.scatter( [trial] * len(trial_data3), trial_data3, color=colors[3 % len(colors)],  alpha=0.05)
+        mean_val = trial_data3.mean()
+        err_val = sem(trial_data3)
+        plt.scatter( trial,  mean_val, color=colors[3 % len(colors)], s=40, label='Session 3' if trial == 0 else None)
+        plt.errorbar( trial, mean_val, yerr=err_val,  ecolor=colors[3 % len(colors)], capsize=3)
 
 plt.xlabel('Trial')
 plt.ylabel('Peak Height (z)')
+plt.legend()
 plt.show()
+
 
 plt.figure(figsize=(5,6))
 df = peak_flick_df.loc[peak_flick_df["Session"] == 7]
