@@ -105,7 +105,7 @@ files = os.listdir(home_dir)
 files.sort()
 print(files)
 ommited_mice = ['8343','8345','8959', '8963',] #due to placement
-mice = ['8339', '8340', '8341', '8342',  '8344',  '8346', '8347', '8957', '8958', '8960', '8961', '8962',  '8964', '8965',  '8967', '8968', '8969', '8970', '8971', '8972']
+mice = ['8339', '8340', '8341', '8342',  '8344',  '8346', '8347', '8957', '8958', '8960', '8961', '8962',  '8964', '8965',  '8967', '8968', '8969', '8970', '8971', '8972', '8343','8345','8959', '8963']
 maxsession = 9 # ommited session 6 because two ctrl were not recorded correctly
 sip_access = 10
 mpc_df = load_formattedMedPC_df(home_dir, mice)
@@ -191,11 +191,11 @@ for j in range(maxsession + 1):
 ephnr = ['8339', '8341', '8342', '8343', '8344', '8345', '8346',  '8959', '8960', '8961', '8963', '8964', '8965']
 ctrl  = ['8340', '8957', '8958', '8962', '8966', '8967', '8968', '8969', '8970', '8971', '8972']
 
-
-
 # -------------------------------------------------------------------
 # Plot ephnr vs ctrl across sessions
 # -------------------------------------------------------------------
+
+
 # Convert session_licks dict → tidy dataframe with group labels
 group_map = {m: 'ephnr' for m in ephnr} | {m: 'ctrl' for m in ctrl}
 
@@ -213,35 +213,95 @@ sessions_to_plot = [2, 3, 4, 5]
 licks_summary_filtered = licks_summary[licks_summary['session'].isin(sessions_to_plot)]
 levers_summary_filtered = levers_summary[levers_summary['session'].isin(sessions_to_plot)]
 
+
 # Plotting
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(len(sessions_to_plot), 6))
 colors = {'ctrl':  '#108080','ephnr': '#AA4B5F'}
 
 for grp in ['ctrl', 'ephnr']:
     df = licks_summary_filtered[licks_summary_filtered['group'] == grp]
     plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
 
-plt.xlabel('Session', fontsize=14)
-plt.ylabel('Licks per Session', fontsize=14)
-plt.title('Session Lick Counts: ephnr vs ctrl', fontsize=16)
+plt.xlabel('Session')
+plt.ylabel('Licks per Session')
+plt.title('Session Lick Counts: ephnr vs ctrl')
 plt.legend(title='Group')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
 plt.tight_layout()
 plt.show()
 
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(len(sessions_to_plot), 6))
 colors = {'ctrl':  '#108080','ephnr': '#AA4B5F'}
 
 for grp in ['ctrl', 'ephnr']:
     df = levers_summary_filtered[levers_summary_filtered['group'] == grp]
     plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
 
-plt.xlabel('Session', fontsize=14)
-plt.ylabel('Presses per Session', fontsize=14)
-plt.title('Session Presses Counts: ephnr vs ctrl', fontsize=16)
+plt.xlabel('Session',)
+plt.ylabel('Presses per Session')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.title('Session Presses Counts: ephnr vs ctrl')
 plt.legend(title='Group')
 plt.tight_layout()
 plt.show()
 
+
+# -------- Baseline is average of sessions 0-2
+def make_baseline_and_sessions(summary_df,baseline_sessions=[0,1,2], sessions=[3,4,5]):
+    # Baseline = mean of sessions 0–2 (already normalized)
+    baseline = (summary_df[summary_df['session'].isin(baseline_sessions)].groupby('group').agg(mean=('mean','mean'), sem=('sem','mean')).reset_index())
+    baseline['session'] = baseline_sessions[-1]  # fake session index for plotting
+    # Keep sessions of interest
+    stim = summary_df[summary_df['session'].isin(sessions)]
+    return pd.concat([baseline, stim], ignore_index=True)
+
+licks_df = pd.DataFrame([(mouse, int(session), count) for (mouse, session), count in session_licks.items() if mouse in group_map], columns=['mouse', 'session', 'licks'])
+licks_df['group'] = licks_df['mouse'].map(group_map)
+baseline_licks = (licks_df[licks_df['session'].isin([0,1,2])].groupby('mouse')['licks'].mean())
+
+levers_df = pd.DataFrame([(mouse, int(session), count) for (mouse, session), count in session_levers.items() if mouse in group_map], columns=['mouse', 'session', 'levers'])
+levers_df['group'] = levers_df['mouse'].map(group_map)
+baseline_levers = (levers_df[levers_df['session'].isin([0,1,2])].groupby('mouse')['levers'].mean())
+
+# Mean ± SEM per session per group
+licks_summary = (licks_df.groupby(['group', 'session'])['licks'].agg(mean='mean', sem='sem').reset_index())
+levers_summary = (levers_df.groupby(['group', 'session'])['levers'].agg(mean='mean', sem='sem').reset_index())
+
+sessions_to_plot = [2, 3, 4, 5]
+licks_plot_df = make_baseline_and_sessions(licks_summary, baseline_sessions=[0,1,2], sessions= [3,4,5])
+levers_plot_df = make_baseline_and_sessions(levers_summary, baseline_sessions=[0,1,2], sessions= [3,4,5])
+
+baseline = (levers_df[levers_df['session'].isin([0,1,2])].groupby('mouse')['levers'].mean())
+# Plotting
+plt.figure(figsize=(4, 6))
+colors = {'ctrl':  '#108080','ephnr': '#AA4B5F'}
+
+for grp in ['ctrl', 'ephnr']:
+    df = licks_plot_df[licks_plot_df['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xlabel('Session')
+plt.ylabel('Licks per Session')
+plt.title('Session Lick Counts: ephnr vs ctrl')
+plt.legend(title='Group')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(4, 6))
+colors = {'ctrl':  '#108080','ephnr': '#AA4B5F'}
+
+for grp in ['ctrl', 'ephnr']:
+    df = levers_plot_df[levers_plot_df['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xlabel('Session',)
+plt.ylabel('Presses per Session')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.title('Session Presses Counts: ephnr vs ctrl')
+plt.legend(title='Group')
+plt.tight_layout()
+plt.show()
 
 # Run Stats
 import statsmodels.formula.api as smf
@@ -309,6 +369,7 @@ posthoc_df['p_fdr'] = multipletests(posthoc_df['p_uncorrected'], method='fdr_bh'
 print(posthoc_df)
 
 
+
 ########################### AVERAGE LATENCY: CUE → LICK ##############################
 licklatency_df = pd.DataFrame([(mouse, int(session), int(trial), count) for (mouse, session, trial), count in lick_latency_dict.items() if mouse in group_map], columns=['mouse', 'session','' ,'latency'])
 licklatency_df['group'] = licklatency_df['mouse'].map(group_map)
@@ -318,20 +379,168 @@ licklatency_summary = (licklatency_df.groupby(['group', 'session'])['latency'].a
 licklatency_summary_filtered = licklatency_summary[licklatency_summary['session'].isin(sessions_to_plot)]
 
 # Plotting
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(4, 6))
 colors = {'ctrl': '#108080', 'ephnr': '#AA4B5F'}
 
 for grp in ['ctrl', 'ephnr']:
     df = licklatency_summary_filtered[licklatency_summary_filtered['group'] == grp]
     plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
 
-plt.xlabel('Session', fontsize=14)
-plt.ylabel('Latency per Session', fontsize=14)
-plt.title('Session Latency Counts: ephnr vs ctrl', fontsize=16)
+plt.xlabel('Session')
+plt.ylabel('Latency per Session')
+plt.title('Session Latency Counts: ephnr vs ctrl')
 plt.legend(title='Group')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
 plt.xticks(sessions_to_plot)  # Only show the sessions we're plotting
 plt.tight_layout()
 plt.show()
+
+
+
+# -------- Percentage change
+# 
+
+licks_pct_df = licks_df.copy()
+baseline = (licks_df[licks_df['session'] == 2].set_index('mouse')['licks'])
+licks_pct_df['baseline_session2'] = licks_pct_df['mouse'].map(baseline)
+licks_pct_df['pct_change_from_s2'] = ((licks_pct_df['licks'] - licks_pct_df['baseline_session2'])/ licks_pct_df['baseline_session2']) * 100
+licks_pct_summary = (licks_pct_df.groupby(['group', 'session'])['pct_change_from_s2'].agg(mean='mean', sem='sem').reset_index())
+licks_pct_summary_filtered = licks_pct_summary[licks_pct_summary['session'].isin(sessions_to_plot)]
+
+
+# Plotting
+plt.figure(figsize=(4, 6))
+colors = {'ctrl': '#108080', 'ephnr': '#AA4B5F'}
+
+for grp in ['ctrl', 'ephnr']:
+    df = licks_pct_summary_filtered[licks_pct_summary_filtered['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xlabel('Session')
+plt.ylabel('Licks per Session')
+plt.title('Lick Counts: ephnr vs ctrl')
+plt.legend(title='Group')
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.xticks(sessions_to_plot)  # Only show the sessions we're plotting
+plt.tight_layout()
+plt.show()
+
+levers_pct_df = levers_df.copy()
+baseline = (levers_df[levers_df['session'] == 2].set_index('mouse')['levers'])
+levers_pct_df['baseline'] = levers_pct_df['mouse'].map(baseline)
+levers_pct_df['pct_change'] = ((levers_pct_df['levers'] - levers_pct_df['baseline']) / levers_pct_df['baseline']) * 100
+levers_pct_summary = (levers_pct_df.groupby(['group','session'])['pct_change'].agg(mean='mean', sem='sem').reset_index())
+levers_pct_summary_filtered = licks_pct_summary[licks_pct_summary['session'].isin(sessions_to_plot)]
+
+
+plt.figure(figsize=(4, 6))
+for grp in ['ctrl', 'ephnr']:
+    df = levers_pct_summary_filtered[levers_pct_summary_filtered['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.xlabel('Session')
+plt.ylabel('% Change in Lever Presses')
+plt.legend(title='Group')
+plt.tight_layout()
+plt.show()
+
+def make_baseline_and_sessions(summary_df,baseline_sessions=[0,1,2], sessions=[3,4,5]):
+    # Baseline = mean of sessions 0–2 (already normalized)
+    baseline = (summary_df[summary_df['session'].isin(baseline_sessions)].groupby('group').agg(mean=('mean','mean'), sem=('sem','mean')).reset_index())
+    baseline['session'] = baseline_sessions[-1]  # fake session index for plotting
+    # Keep sessions of interest
+    stim = summary_df[summary_df['session'].isin(sessions)]
+    return pd.concat([baseline, stim], ignore_index=True)
+
+### this is by average of three baslines
+licks_pct_df = licks_df.copy()
+#baseline = (licks_df[licks_df['session'] == 2].set_index('mouse')['licks'])
+baseline = (licks_df[licks_df['session'].isin([0, 1, 2])].groupby('mouse')['licks'].mean())
+licks_pct_df['baseline_session2'] = licks_pct_df['mouse'].map(baseline)
+licks_pct_df['pct_change_from_s2'] = ((licks_pct_df['licks'] - licks_pct_df['baseline_session2'])/ licks_pct_df['baseline_session2']) * 100
+# Mean ± SEM per session per group
+licks_pct_summary = (licks_pct_df.groupby(['group', 'session'])['pct_change_from_s2'].agg(mean='mean', sem='sem').reset_index())
+
+licks_plot_df = make_baseline_and_sessions(licks_pct_summary, baseline_sessions=[0,1,2], sessions= [3,4,5])
+
+plt.figure(figsize=(4, 6))
+colors = {'ctrl': '#108080', 'ephnr': '#AA4B5F'}
+
+for grp in ['ctrl', 'ephnr']:
+    df = licks_plot_df[licks_plot_df['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'],marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.xlabel('Session')
+plt.ylabel('% Change in Licks')
+plt.legend(title='Group')
+plt.tight_layout()
+plt.show()
+
+baseline = (levers_df[levers_df['session'].isin([0,1,2])].groupby('mouse')['levers'].mean())
+levers_pct_df = levers_df.copy()
+levers_pct_df['baseline'] = levers_pct_df['mouse'].map(baseline)
+levers_pct_df['pct_change'] = ((levers_pct_df['levers'] - levers_pct_df['baseline']) / levers_pct_df['baseline']) * 100
+levers_pct_summary = (levers_pct_df.groupby(['group','session'])['pct_change'].agg(mean='mean', sem='sem').reset_index())
+
+levers_plot_df = make_baseline_and_sessions(levers_pct_summary,baseline_sessions=[0,1,2], sessions= [3,4,5])
+
+plt.figure(figsize=(4, 6))
+for grp in ['ctrl', 'ephnr']:
+    df = levers_plot_df[levers_plot_df['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.xlabel('Session')
+plt.ylabel('% Change in Lever Presses')
+plt.legend(title='Group')
+plt.tight_layout()
+plt.show()
+
+# 
+licklatency_pct_df = licklatency_df.copy()
+baseline = (licklatency_pct_df[licklatency_pct_df['session'].isin([0, 1, 2])].groupby('mouse')['latency'].mean())
+licklatency_pct_df['baseline_session2'] = licklatency_pct_df['mouse'].map(baseline)
+licklatency_pct_df['pct_change_from_s2'] = ((licklatency_pct_df['latency'] - licklatency_pct_df['baseline_session2'])/ licklatency_pct_df['baseline_session2']) * 100
+licklatency_pct_summary = (licklatency_pct_df.groupby(['group', 'session'])['pct_change_from_s2'].agg(mean='mean', sem='sem').reset_index())
+licklatency_plot_df = make_baseline_and_sessions(licklatency_pct_summary,  baseline_sessions, sessions_to_plot)
+
+plt.figure(figsize=(4, 6))
+for grp in ['ctrl', 'ephnr']:
+    df = licklatency_plot_df[licklatency_plot_df['group'] == grp]
+    plt.errorbar(df['session'], df['mean'], yerr=df['sem'], marker='o', linewidth=1, capsize=2, color=colors[grp], label=grp)
+
+plt.xticks([2,3,4,5], ['Baseline', 'Opto 1', 'Opto 2', 'Opto 3'])
+plt.xlabel('Session')
+plt.ylabel('% Change in Latency')
+plt.legend(title='Group')
+plt.tight_layout()
+plt.show()
+
+# -------- For Putting into Prism
+def make_mouse_wide_pct_df(df,value_col, baseline_sessions=(0, 1, 2), sessions_of_interest=(3, 4, 5), mouse_col='mouse', session_col='session', group_col='group'):
+    df = df.copy()
+    baseline = (df[df[session_col].isin(baseline_sessions)].groupby(mouse_col)[value_col].mean())
+    # df['pct_change'] = ((df[value_col] - df[mouse_col].map(baseline))/ df[mouse_col].map(baseline)) * 100
+
+    # ---- Baseline column (in pct-change space)
+    # baseline_pct = (df[df[session_col].isin(baseline_sessions)].groupby(mouse_col)['pct_change'].mean().rename('baseline'))
+
+    # ---- Sessions 3–5 columns
+    sessions = (df[df[session_col].isin(sessions_of_interest)].pivot(index=mouse_col, columns=session_col, values=value_col).rename(columns={s: f'session{s}' for s in sessions_of_interest}))
+
+    # ---- Combine
+    wide_df = pd.concat([baseline, sessions], axis=1)
+
+    # ---- Add group column
+    wide_df[group_col] = (df.drop_duplicates(mouse_col).set_index(mouse_col)[group_col])
+
+    return wide_df
+
+licks_mouse_wide = make_mouse_wide_pct_df(licks_df, value_col='licks')
+levers_mouse_wide = make_mouse_wide_pct_df(levers_df, value_col='levers')
+latency_mouse_wide = make_mouse_wide_pct_df(licklatency_df, value_col='latency')
 
 
 ########################### FIRST LICK LATENCY AFTER LEVER ##############################
@@ -359,6 +568,8 @@ for mouse, session in lick_latency_dict:
 
 flickdf_ephnr.to_csv('/Users/kristineyoon/Documents/flickdf_ephnr.csv')
 flickdf_ctrl.to_csv('/Users/kristineyoon/Documents/flickdf_ctrl.csv')
+
+
 
 
 ########################### KDE BY SESSION (EPHNR) ##############################

@@ -14,18 +14,26 @@ folder = '/Users/kristineyoon/Library/CloudStorage/OneDrive-Vanderbilt/D1D2_Fibe
 
 
 # ------- D2 MEDIUM SPINY NEURONS (ALCOHOL) -------
-mice = ['7098','7099','7107','7108', '7310', '7311', '7319', '7321','8729','8730','8731','8732','9299','9302','9325','9326','9327'] #'7296',
+mice = ['7098','7099','7107','7108', '7310', '7311', '7319', '7321','8729','8730','8731','8732','9299','9302','9327'] #'7296','9325','9326',
+male = ['7107','7108','7319', '7321','8729','8730','8731','8732','9299','9302']
+female = ['7098','7099','7310', '7311','9325','9326','9327' ]
 # mice = ['9299','9302','9325','9326','9327']
 experiment = 'D2_EtOHLearning'
+
+experiment = 'D2_EtOHLongExtinction'
 # experiment = 'D2_1WeekWD'
+
+
 
 # mice = ['7098','7099','7108', '7311', '7319', '7321','8729','8730','8731','8732'] #'7296',
 # experiment = 'D2_EtOHExtinction'
 
 # ------- D2 MEDIUM SPINY NEURONS (SUCROSE) -------
 
-mice = ['7678', '7680', '8733','8742','8743','8747','8748','8750']
-experiment = 'D2_SucLearning'
+mice = ['7678', '7680', '8733','8742','8743','8747','8748','8750', '7899']
+experiment = 'D2_SucLearning' #7899 ommitted for this because they did not lick on session 3
+male = ['7678', '7680','8742','8743','8747','8748']
+female = ['7899', '8733','8750']
 # mice = ['7678', '7680', '7899','8733','8742','8743','8747','8748','8750']
 # experiment = 'D2_SucExtinction'
 # experiment = 'D2_SuctoEtOH_EtOHLearning'
@@ -34,11 +42,13 @@ experiment = 'D2_SucLearning'
 
 
 # ------- D1 MEDIUM SPINY NEURONS -------
-# mice = ['676', '679', '849', '873', '874', '917']
+mice = ['676', '679', '849', '873', '874', '917']
 # experiment = 'D1_EtOHLearning'
 # experiment = 'D1_1WeekWD'
+male = ['676', '679', '849']
+female = ['873', '874', '917']
 # experiment = 'D1_EtOHExtinction'
-# experiment = 'D1_SucLearning'
+experiment = 'D1_SucLearning'
 # experiment = 'D1_SucExtinction'
 
 # -------------------------- HELPER FUNCTIONS --------------------------
@@ -163,6 +173,12 @@ for mouse in tqdm(mice, desc="Processing mice"):
     # Map date → session index (starting at 0)
     session_map = {date: i for i, date in enumerate(dates)}
 
+    if mouse in male:
+        sex = 'M'
+    elif mouse in female:
+        sex = 'F'
+    print(sex)
+        
     for date in dates:
         session_idx = session_map[date]
         date_dir = os.path.join(mouse_dir, date)
@@ -211,16 +227,18 @@ for mouse in tqdm(mice, desc="Processing mice"):
         if len(track_cue) > 10:
             totallicks = track_licks[track_licks < track_cue[10]]
             totalresponse = track_lever[track_lever < track_cue[10]]
-            totaltimeout = track_to[track_to < track_cue[10]]
+            totaltimeout = track_to[track_to < track_cue[9]]
             track_cue = track_cue[:10]
         else:
             totallicks = track_licks
             totalresponse = track_lever
-            totaltimeout = track_to
+            totaltimeout = track_to[track_to < track_cue[-1]]
         
-        lickspersession.append({'Mouse': mouse, 'Session:': session_idx, 'Licks':len(totallicks)})
-        responsepersession.append({'Mouse': mouse,'Session:': session_idx, 'Responses':len(totalresponse)})
-        timeoutpersession.append({'Mouse': mouse,'Session:': session_idx, 'Responses':len(totaltimeout)})
+        
+            
+        lickspersession.append({'Mouse': mouse, 'Session': session_idx, 'Licks':len(totallicks), 'Sex': sex})
+        responsepersession.append({'Mouse': mouse,'Session:': session_idx, 'Responses':len(totalresponse), 'Sex': sex})
+        timeoutpersession.append({'Mouse': mouse,'Session:': session_idx, 'Responses':len(totaltimeout), 'Sex': sex})
 
         # ------------------- CUE ALIGNMENT -------------------
         cue_baselines = []
@@ -234,7 +252,7 @@ for mouse in tqdm(mice, desc="Processing mice"):
             cue_baselines.append((baseline_mean, baseline_std))
 
             trial_signal = (df['Filtered'].iloc[cue_baseline:cue_end] - baseline_mean) / baseline_std
-
+            
             all_cue_trials.append({
                 'Mouse': mouse,
                 'Session': session_idx,
@@ -242,7 +260,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'CueTime': cue_time,
                 'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
-                'BaselineStd': baseline_std
+                'BaselineStd': baseline_std,
+                'Sex': sex
             })
 
         # ------------------- LEVER ALIGNMENT -------------------
@@ -266,7 +285,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'LeverTime': lever_time,
                 'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
-                'BaselineStd': baseline_std
+                'BaselineStd': baseline_std,
+                'Sex': sex
             })
 
         # ------------------- FIRST LICK ALIGNMENT -------------------
@@ -295,7 +315,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std,
-                'Licks': licks[i]
+                'Licks': licks[i],
+                'Sex': sex
             })
 
         # ------------------- LICK BOUT ALIGNMENT -------------------
@@ -329,7 +350,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'StartTime': start_time,
                 'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
-                'BaselineStd': baseline_std
+                'BaselineStd': baseline_std,
+                'Sex': sex
             })
 
         # ------------------- ALL TRIAL ALIGNMENT -------------------
@@ -362,7 +384,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                 'Trace': trial_signal,
                 'BaselineMean': baseline_mean,
                 'BaselineStd': baseline_std,
-                'Latency': flick_time-cue_time
+                'Latency': flick_time-cue_time,
+                'Sex': sex
             })
         # ------------------- ITI ALIGNMENT -------------------
         timerange_iti = [-40,-10]
@@ -391,7 +414,8 @@ for mouse in tqdm(mice, desc="Processing mice"):
                     'CueTime': cue_time,
                     'Trace': trial_signal,
                     'TimeOuts': trial_to,
-                    'TimeoutLength': len(trial_to)
+                    'TimeoutLength': len(trial_to),
+                    'Sex': sex
                 })
 # -------------------------- CONVERT TO DATAFRAMES --------------------------
 avgcuetrace_df = pd.DataFrame(all_cue_trials)
@@ -495,6 +519,12 @@ behavioral_licks_df = pd.DataFrame(lickspersession)
 behavioral_response_df = pd.DataFrame(responsepersession)
 behavioral_timeout_df = pd.DataFrame(timeoutpersession)
 
+behavioral_licks_matrix_df = behavioral_licks_df.pivot_table(index=["Mouse"], columns="Session", values="Licks", aggfunc="first") 
+behavioral_response_matrix_df = behavioral_response_df.pivot_table(index=["Mouse"], columns="Session:", values="Responses", aggfunc="first") 
+behavioral_timeout_matrix_df = behavioral_timeout_df.pivot_table(index=["Mouse"], columns="Session:", values="Responses", aggfunc="first") 
+
+behavioral_licklatency_matrix_df= alltrialtrace_df.pivot_table(index=["Mouse"], columns="Session", values="LickLate", aggfunc="mean") 
+
 # ----------------------------------------------------------------------------
 # ------------------------- NOW THE FUN STUFF!!!!!!! -------------------------
 # ----------------------------------------------------------------------------
@@ -507,7 +537,7 @@ colors10 = sns.color_palette("husl", 10)
 cmapcolor = 'vlag' #sns.diverging_palette(250, 30, l=60, as_cmap=True)
 
 # ---- INTERTRIAL INTERVALS SORTED BY LATENCY TO PRESS DURING TIME OUT ----
-session_list = [0]
+session_list = [2,5]
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 8))
 timerange_iti_new = [0,timerange_iti[1]-timerange_iti[0]]
@@ -577,6 +607,8 @@ plt.show()
 
 def plot_traces_bysession(df, label,ogtime, timerange, ylim, savepath):
     session_list = sorted(df['Session'].unique())
+    session_list=[3,7]
+    # session_list=[0,1,2,3,4,5,6,7]
     plt.figure(figsize=(timerange[1]-timerange[0], 8))
     for i, session in enumerate(session_list):
         traces = np.stack(df.loc[df['Session']==session, 'Trace'])
@@ -619,6 +651,65 @@ plot_traces_bysession(avgcuebyresponsetrace_df, 'Response Cue', timerange_cue, [
 plot_traces_bysession(avgcuebynoresponsetrace_df, 'No Response Cue', timerange_cue, [-2,10], (-2,4), f'/Users/kristineyoon/Documents/{experiment}_cuebynoresponse.pdf')
 
 
+# ---------------
+def plot_traces_bysession_bysex(df, label, ogtime, timerange, ylim, savepath_base):
+    sexes = df['Sex'].unique()
+
+    for sex in sexes:
+        sex_df = df[df['Sex'] == sex]
+        session_list = sorted(sex_df['Session'].unique())
+        session_list = [3,4,5,6,7]
+
+        plt.figure(figsize=(timerange[1]-timerange[0], 8))
+
+        for i, session in enumerate(session_list):
+            traces = np.stack(sex_df.loc[sex_df['Session'] == session, 'Trace'])
+            time = np.linspace(ogtime[0], ogtime[1], len(traces[0]))
+
+            start_idx = np.searchsorted(time, timerange[0])
+            end_idx = np.searchsorted(time, timerange[1])
+            timesegment = time[start_idx:end_idx]
+
+            mean_trace = traces.mean(axis=0)[start_idx:end_idx]
+            sem_trace = sem(traces, axis=0)[start_idx:end_idx]
+
+            plt.plot(mean_trace,
+                     color=colors[i % len(colors)],
+                     label=f'Session {session}')
+            plt.fill_between(range(len(mean_trace)),
+                             mean_trace - sem_trace,
+                             mean_trace + sem_trace,
+                             color=colors[i % len(colors)],
+                             alpha=0.1)
+
+        plt.xlabel('Time (samples)')
+        plt.xlim(0, len(timesegment))
+        plt.xticks(
+            np.linspace(0, len(timesegment), timerange[1]-timerange[0]+1),
+            np.arange(timerange[0], timerange[1]+1)
+        )
+
+        plt.axhline(0, linestyle=':', color='black')
+        plt.axvline(
+            x=len(timesegment)/(timerange[1]-timerange[0])*(0-timerange[0]),
+            linewidth=1, color='black'
+        )
+
+        plt.ylabel('z-score')
+        plt.title(f'Average {label}-Aligned Trace ({sex}) by Session')
+        plt.legend()
+        plt.ylim(ylim)
+        plt.tight_layout()
+
+        plt.savefig(f"{savepath_base}_{sex}.png", transparent=True)
+        plt.show()
+
+
+plot_traces_bysession_bysex(avgcuetrace_df,'Cue', timerange_cue, [-2,5], (-6,8),savepath_base='cue_trace_bysex')
+plot_traces_bysession_bysex(avglevertrace_df, 'Lever', timerange_lever,timerange_lever, (-6,8), savepath_base='lever_trace_bysex')
+plot_traces_bysession_bysex(avgflicktrace_df, 'First Lick', timerange_lick, [-2,10], (-6,8), savepath_base='lick_trace_bysex')
+
+
 # ------------------------- Finding Peak Height  -------------------------
 
 totalsessions = len(sorted(avgcuetrace_df['Session'].unique()))
@@ -652,6 +743,14 @@ def compute_peak_df(df, timerange, analysis_window, label):
 
 peak_cue_df = compute_peak_df(avgcuetrace_df, timerange_cue, [0,1], "Cue")
 peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-1,1], "Lever")                   
+peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,2], "FirstLick")                   
+peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+
+peak_cue_matrix2_df = peak_cue_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+peak_lever_matrix2_df = peak_lever_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+peak_flick_matrix2_df = peak_flick_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
 
 
 
@@ -690,10 +789,14 @@ peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="
 # # ------------------------- LOOKING AT PEAK HEIGHT -------------------------
 # peak_cue_df = compute_peak_df(df = avgcuetrace_df, timerange = timerange_cue, analysis_window=[0,2], label="Cue", min_height=-5, min_prominence=0.1)                                                
 # peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
-# peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-0.5,0.5], "Lever", min_height=-5, min_prominence=0.2)                   
+# peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-1,1], "Lever", min_height=-5, min_prominence=0.2)                   
 # peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
 # peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,2], "FirstLick", min_height=-5, min_prominence=0.2)                   
 # peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+
+# peak_cue_matrix2_df = peak_cue_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+# peak_lever_matrix2_df = peak_lever_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+# peak_flick_matrix2_df = peak_flick_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
 
 
 # ------------------------- Running Nested Statistics on Cue -------------------------
@@ -704,6 +807,7 @@ from scipy.stats import ttest_rel
 from scipy.stats import chi2
 
 sessions_of_interest = [3,7]
+#sessions_of_interest = [2,5]
 
 # Average across trials within mouse
 mouse_means = (peak_cue_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
@@ -733,7 +837,6 @@ for session in session_list:
     peaktime = peak_cue_df.loc[peak_cue_df['Session']==session, 'PeakTime'].values
 
     time = np.linspace(timerange[0], timerange[1], traces.shape[1])
-
     for k in range(len(traces)):
         # Plot trace
         plt.plot(time, traces[k], color=colors[session % len(colors)], alpha=0.2)
@@ -754,12 +857,10 @@ plt.show()
 
 
 # ------------------------- LOOKING AT LEVER AND FIRST LICK PEAK HEIGHT -------------------------
-peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-0.5,0.5], "Lever")                   
-peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
-peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,1], "FirstLick")                   
-peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
 
 sessions_of_interest = [2, 5]
+sessions_of_interest = [3,7]
+sessions_of_interest = [1,6][
 # Average across trials within mouse
 mouse_means = (peak_cue_matrix_df[sessions_of_interest].groupby(level="Mouse").mean())
 mouse_means_clean = mouse_means.dropna()
@@ -788,7 +889,7 @@ print('----Looking at First Lick Peak Height----')
 print(f"Nested paired t-test (Session {sessions_of_interest[0]} vs {sessions_of_interest[1]})")
 print(f"n mice = {len(mouse_means_clean)}")
 print(f"t = {t_stat:.3f}, p = {p_val:.4g}")
-print('------------------------------------')
+print('------------------------------------')]
 
 
 # ---------------------- Plotting Peak Height ----------------------
@@ -938,6 +1039,127 @@ for s1, s2 in pairs:
     print(f"Session {s1} vs {s2}: t = {t:.3f}, p = {p:.4g}")
 
 
+#---------------------
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from scipy.stats import spearmanr
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+print("\nBuilding Master Trial-by-Trial DataFrame (Using Peak Heights)...")
+
+# 1. Start with the base trial timing and latencies
+master_df = alltrialtrace_df[['Mouse', 'Session', 'Trial', 'LeverLate', 'LickLate', 'Latency']].copy()
+
+# 2. Add Binary Outcomes (1 = happened, 0 = didn't happen)
+master_df['Pressed'] = master_df['LeverLate'].notna().astype(int)
+master_df['Licked'] = master_df['Latency'].notna().astype(int)
+
+# 3. Add Neural Features (Using your Peak Height dataframes instead of AUC)
+master_df = pd.merge(master_df, peak_cue_df[['Mouse', 'Session', 'Trial', 'PeakHeight']].rename(columns={'PeakHeight': 'Cue_Peak'}), on=['Mouse', 'Session', 'Trial'], how='left')
+master_df = pd.merge(master_df, peak_lever_df[['Mouse', 'Session', 'Trial', 'PeakHeight']].rename(columns={'PeakHeight': 'Lever_Peak'}), on=['Mouse', 'Session', 'Trial'], how='left')
+master_df = pd.merge(master_df, peak_flick_df[['Mouse', 'Session', 'Trial', 'PeakHeight']].rename(columns={'PeakHeight': 'Lick_Peak'}), on=['Mouse', 'Session', 'Trial'], how='left')
+
+# 4. Add Behavioral Features (Max Bout Length per Trial)
+trial_bouts = avglickbouttrace_df.groupby(['Mouse', 'Session', 'Trial'])['BoutLength'].max().reset_index()
+master_df = pd.merge(master_df, trial_bouts, on=['Mouse', 'Session', 'Trial'], how='left')
+master_df['BoutLength'] = master_df['BoutLength'].fillna(0) 
+
+# 5. Add Timeout Presses (Amount of ITI timeout presses before this trial)
+timeout_counts = allititrace_df[['Mouse', 'Session', 'Trial', 'TimeoutLength']].copy()
+timeout_counts.rename(columns={'TimeoutLength': 'TimeoutCount'}, inplace=True)
+master_df = pd.merge(master_df, timeout_counts, on=['Mouse', 'Session', 'Trial'], how='left')
+master_df['TimeoutCount'] = master_df['TimeoutCount'].fillna(0)
+
+# Drop trials where photometry baseline failed
+master_df = master_df.dropna(subset=['Cue_Peak'])
+
+print("\n" + "="*60)
+print("QUESTION 1: PREDICTIVE POWER OVER SESSIONS (PEAK HEIGHTS)")
+print("="*60)
+
+
+# --- A. LIKELIHOOD TO LEVER PRESS (Logistic Regression) ---
+if master_df['Pressed'].nunique() > 1: # Ensures there's a mix of Yes/No presses
+    try:
+        logit_press = smf.logit("Pressed ~ Cue_Peak + TimeoutCount + Session", data=master_df).fit(disp=0)
+        print("\n--- Likelihood to Lever Press ---")
+        print(logit_press.summary().tables[1])
+        print("-> If the P>|z| for Cue_Peak is < 0.05, it significantly predicts a lever press.")
+    except:
+        print("Logit failed. (Animals might press 100% of the time).")
+
+# --- B. LATENCY TO LEVER PRESS (Linear Mixed Model) ---
+df_lat = master_df[master_df['Pressed'] == 1].dropna(subset=['LeverLate', 'Cue_Peak'])
+if len(df_lat) > 0:
+    lmm_lat = smf.mixedlm("LeverLate ~ Cue_Peak + Session", df_lat, groups=df_lat["Mouse"]).fit()
+    print("\n--- Latency to Lever Press ---")
+    print(lmm_lat.summary().tables[1])
+    print("-> A negative coefficient (Coef.) for Cue_Peak means a higher fluorescence peak results in a FASTER press.")
+
+# --- C. PREDICTING LICK BOUT LENGTH (Model Comparison) ---
+# We compare the Cue, Lever, and Lick signals head-to-head using AIC
+df_bout = master_df[master_df['BoutLength'] > 0].dropna(subset=['Cue_Peak', 'Lever_Peak', 'Lick_Peak'])
+if len(df_bout) > 0:
+    mod_cue = smf.mixedlm("BoutLength ~ Cue_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
+    mod_lev = smf.mixedlm("BoutLength ~ Lever_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
+    mod_lick = smf.mixedlm("BoutLength ~ Lick_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
+
+    print("\n--- Predicting Amount Drank (Bout Length) ---")
+    print(f"Cue Signal AIC:   {mod_cue.aic:.1f}")
+    print(f"Lever Signal AIC: {mod_lev.aic:.1f}")
+    print(f"Lick Signal AIC:  {mod_lick.aic:.1f}")
+    print("-> The model with the LOWEST AIC is the strongest predictor of how much the animal drinks.")
+
+
+print("\n" + "="*60)
+print("QUESTION 2: DYNAMICS ON THE LAST DAY OF LEARNING (PEAK HEIGHTS)")
+print("="*60)
+
+max_session = master_df['Session'].max()
+df_last = master_df[master_df['Session'] == max_session].copy()
+print(f"Analyzing Final Session: {max_session}")
+
+# Filter for successful trials to correlate metrics
+df_corr = df_last[df_last['Pressed'] == 1].dropna(subset=['Cue_Peak', 'Lever_Peak', 'Lick_Peak', 'LeverLate', 'BoutLength'])
+
+if len(df_corr) > 0:
+    # 1. Spearman Correlations
+    print("\nCorrelations with Lever Latency:")
+    r, p = spearmanr(df_corr['Cue_Peak'], df_corr['LeverLate'])
+    print(f"  Cue_Peak vs Lever Latency: r = {r:+.3f}, p = {p:.4f}")
+
+    print("\nCorrelations with Lick Bout Length (Amount Consumed):")
+    for sig in ['Cue_Peak', 'Lever_Peak', 'Lick_Peak']:
+        r, p = spearmanr(df_corr[sig], df_corr['BoutLength'])
+        print(f"  {sig} vs Bout Length: r = {r:+.3f}, p = {p:.4f}")
+
+# 2. Visualize Neural Signals vs Bout Length
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+
+sns.regplot(data=df_last, x='Cue_Peak', y='BoutLength', ax=axes[0], color='gold', scatter_kws={'alpha':0.5})
+axes[0].set_title('Cue Peak vs Bout Length')
+
+sns.regplot(data=df_last, x='Lever_Peak', y='BoutLength', ax=axes[1], color='blueviolet', scatter_kws={'alpha':0.5})
+axes[1].set_title('Lever Peak vs Bout Length')
+
+sns.regplot(data=df_last, x='Lick_Peak', y='BoutLength', ax=axes[2], color='orchid', scatter_kws={'alpha':0.5})
+axes[2].set_title('First Lick Peak vs Bout Length')
+
+plt.suptitle(f"Neural Encoding of Consumption (Session {max_session})")
+plt.tight_layout()
+plt.show()
+
+# 3. Does the signal change "as they drink more"? (Interaction with Trial)
+df_last_bouts = df_last[df_last['BoutLength'] > 0].dropna(subset=['Lick_Peak'])
+if len(df_last_bouts) > 0:
+    interact_mod = smf.ols("BoutLength ~ Lick_Peak * Trial", data=df_last_bouts).fit()
+    print("\n--- Does the Lick signal change over time (as they reach satiety)? ---")
+    print(interact_mod.summary().tables[1])
+    print("-> Look at 'Lick_Peak:Trial'. If P<0.05, the neural encoding of licking fundamentally changes as they reach satiety.")
+    
+    
 # ---------------------- Categorizing Lick Bouts ---------------------- 
 def categorize_lick_bout(bout_length):
     if bout_length <= 20 and bout_length > 10:
