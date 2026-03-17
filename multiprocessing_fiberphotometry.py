@@ -24,7 +24,9 @@ experiment = 'D2_EtOHLearning'
 
 mice = ['9299','9302','9325','9326','9327']
 experiment = 'D2_EtOHLongExtinction'
-# experiment = 'D2_1WeekWD'
+
+mice = ['7098','7099','7108', '7311', '7319', '7321','8729','8730','8731','8732']
+experiment = 'D2_1WeekWD'
 
 
 
@@ -37,22 +39,22 @@ mice = ['7678', '7680', '8733','8742','8743','8747','8748','8750', '7899']
 experiment = 'D2_SucLearning' #7899 ommitted for this because they did not lick on session 3
 male = ['7678', '7680','8742','8743','8747','8748']
 female = ['7899', '8733','8750']
-# mice = ['7678', '7680', '7899','8733','8742','8743','8747','8748','8750']
+mice = ['7678', '7680', '7899','8733','8742','8743','8747','8748','8750']
 # experiment = 'D2_SucExtinction'
 # experiment = 'D2_SuctoEtOH_EtOHLearning'
-# experiment = 'D2_SuctoEtOH_AlcExtinction'
-# experiment = 'D2_SuctoEtOH_SucExtinction2'
+experiment = 'D2_SuctoEtOH_AlcExtinction'
+experiment = 'D2_SuctoEtOH_SucExtinction2'
 
 
 # ------- D1 MEDIUM SPINY NEURONS -------
 mice = ['676', '679', '849', '873', '874', '917']
-experiment = 'D1_EtOHLearning'
+# experiment = 'D1_EtOHLearning'
 # experiment = 'D1_1WeekWD'
 male = ['676', '679', '849']
 female = ['873', '874', '917']
 # experiment = 'D1_EtOHExtinction'
 # experiment = 'D1_SucLearning'
-# experiment = 'D1_SucExtinction'
+experiment = 'D1_SucExtinction'
 
 # -------------------------- HELPER FUNCTIONS --------------------------
 def extract_events(data, events, epocs):
@@ -500,6 +502,123 @@ behavioral_timeout_matrix_df = behavioral_timeout_df.pivot_table(index=["Mouse"]
 behavioral_licklatency_matrix_df= alltrialtrace_df.pivot_table(index=["Mouse"], columns="Session", values="LickLate", aggfunc="mean") 
 
 
+# ---------------------- Finding Area Under the Curve (AUC) ----------------------
+def compute_auc(df, timerange, interval, trial_limit=10):
+    """
+    Compute AUC for each trial in df over the given interval.
+    
+    df: DataFrame with columns ['Mouse', 'Session', 'Trial', 'Trace']
+    timerange: tuple (start, end) of full trace
+    interval: tuple (start, end) of AUC interval
+    trial_limit: only include trials less than this number
+    """
+    results = []
+
+    for _, row in df.iterrows():
+        if row['Trial'] < trial_limit:
+            trace = row['Trace']
+            time = np.linspace(timerange[0], timerange[1], len(trace))
+            
+            start_idx = np.searchsorted(time, interval[0])
+            end_idx = np.searchsorted(time, interval[1])
+            
+            trace_segment = trace[start_idx:end_idx]
+            time_segment = time[start_idx:end_idx]
+            
+            area = simpson(trace_segment, time_segment)
+            
+            results.append({
+                'Mouse': row['Mouse'],
+                'Session': row['Session'],
+                'Trial': row['Trial'],
+                'AUC': area
+            })
+    
+    return pd.DataFrame(results)
+
+def plot_auc(df, ylabel, ylim):
+    session_list = len(sorted(df['Session'].unique()))
+    plt.figure(figsize=(5, 6))
+    for session in range(session_list):
+        session_data = df[df['Session'] == session]['AUC'].values
+        if len(session_data) > 0:
+            plt.scatter([session]*len(session_data), session_data,
+                        color=colors[session % len(colors)], alpha=0.05)
+            mean_val = session_data.mean()
+            err_val = sem(session_data)
+            plt.scatter(session, mean_val, color=colors[session % len(colors)])
+            plt.errorbar(session, mean_val, yerr=err_val, color=colors[session % len(colors)],
+                         capsize=3)
+    plt.xlabel('Session')
+    plt.ylim(ylim)
+    plt.title(f'{ylabel} in {experiment} by Session')
+    plt.ylabel(ylabel)
+    plt.tight_layout()
+    plt.show()
+
+# Compute AUC DataFrames
+auc_baseline_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(-2, 0))
+auc_baseline_matrix_df =  auc_baseline_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+auc_cue_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(0, 1))
+auc_cue_matrix_df = auc_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+
+auc_lever_df = compute_auc(avglevertrace_df, timerange_lever, interval=(-.5, .5))
+auc_flick_df = compute_auc(avgflicktrace_df, timerange_lick, interval=(0,1))
+auc_lever_matrix_df = auc_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+auc_flick_matrix_df = auc_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
+
+
+auc_baseline_matrix2_df =  auc_baseline_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_cue_matrix2_df = auc_cue_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_lever_matrix2_df = auc_lever_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_flick_matrix2_df = auc_flick_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+
+
+
+# ------------------------- Finding Peak Height Using SCIPY FIND PEAKS  -------------------------
+import numpy as np
+import pandas as pd
+from scipy.signal import find_peaks
+
+def compute_peak_df(df, timerange, analysis_window, label, min_height=None, min_prominence=None):
+    results = []
+
+    for _, row in df.iterrows():
+        mouse   = row["Mouse"]
+        session = row["Session"]
+        trial   = row["Trial"]
+        trace   = row["Trace"]
+        time = np.linspace(timerange[0], timerange[1], len(trace))
+
+        start_idx = np.searchsorted(time, analysis_window[0])
+        end_idx   = np.searchsorted(time, analysis_window[1])
+        trace_segment = trace[start_idx:end_idx].reset_index(drop=True)
+        time_segment  = time[start_idx:end_idx]
+        peaks, properties = find_peaks(trace_segment, height=min_height, prominence=min_prominence)
+
+        if len(peaks) == 0:
+            peakheight = np.nan
+            peak_time  = np.nan
+        else:
+            # take the largest peak
+            peak_idx = peaks[np.argmax(properties["prominences"])]
+            peakheight = trace_segment[peak_idx]
+            peak_time  = time_segment[peak_idx]
+        results.append({"Alignment": label, "Mouse": mouse, "Session": session, "Trial": trial, "PeakHeight": peakheight, "PeakTime": peak_time})
+    return pd.DataFrame(results)
+
+# ------------------------- LOOKING AT PEAK HEIGHT -------------------------
+peak_cue_df = compute_peak_df(df = avgcuetrace_df, timerange = timerange_cue, analysis_window=[0,2], label="Cue", min_height=-5, min_prominence=0.1)                                                
+peak_cue_matrix_df = peak_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+peak_lever_df = compute_peak_df(avglevertrace_df, timerange_lever, [-1,1], "Lever", min_height=-5, min_prominence=0.2)                   
+peak_lever_matrix_df = peak_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+peak_flick_df = compute_peak_df(avgflicktrace_df, timerange_lick, [0,2], "FirstLick", min_height=-5, min_prominence=0.2)                   
+peak_flick_matrix_df = peak_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="PeakHeight", aggfunc="first") 
+
+peak_cue_matrix2_df = peak_cue_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+peak_lever_matrix2_df = peak_lever_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+peak_flick_matrix2_df = peak_flick_df.pivot_table(index=["Mouse"], columns="Session", values="PeakHeight", aggfunc="mean") 
+
 # -------------------------- by response at the trial --------------------------
 responsetrials = []
 noresponsetrials = []
@@ -638,8 +757,8 @@ colors10 = sns.color_palette("husl", 10)
 
 def plot_traces_bysession(df, label,ogtime, timerange, ylim, savepath):
     session_list = sorted(df['Session'].unique())
-    session_list=[3,7]
-    session_list=[2,6]
+    # session_list=[3,7]
+    # session_list=[2,6]
     # session_list=[0,1,6,11]
     plt.figure(figsize=(timerange[1]-timerange[0], 8))
     for i, session in enumerate(session_list):
@@ -840,7 +959,7 @@ from scipy.stats import chi2
 
 sessions_of_interest = [3,7]
 #sessions_of_interest = [2,5]
-sessions_of_interest = [2, 5]
+sessions_of_interest = [2, 6]
 sessions_of_interest = [3,7]
 sessions_of_interest = [1,6]
 sessions_of_interest = [1,11]
@@ -1248,7 +1367,7 @@ def plot_auc(df, ylabel, ylim):
     plt.show()
 
 # Compute AUC DataFrames
-auc_baseline_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(-1, 0))
+auc_baseline_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(-2, 0))
 auc_baseline_matrix_df =  auc_baseline_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
 auc_cue_df = compute_auc(avgcuetrace_df, timerange_cue, interval=(0, 1))
 auc_cue_matrix_df = auc_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
@@ -1259,10 +1378,11 @@ auc_lever_matrix_df = auc_lever_df.pivot_table(index=["Mouse", "Trial"], columns
 auc_flick_matrix_df = auc_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="first") 
 
 
-auc_baseline_matrix2_df =  auc_baseline_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="mean") 
-auc_cue_matrix2_df = auc_cue_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="mean") 
-auc_lever_matrix2_df = auc_lever_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="mean") 
-auc_flick_matrix2_df = auc_flick_df.pivot_table(index=["Mouse", "Trial"], columns="Session", values="AUC", aggfunc="mean") 
+auc_baseline_matrix2_df =  auc_baseline_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_cue_matrix2_df = auc_cue_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_lever_matrix2_df = auc_lever_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+auc_flick_matrix2_df = auc_flick_df.pivot_table(index=["Mouse"], columns="Session", values="AUC", aggfunc="mean") 
+
 
 
 # auc_responsecue_df = compute_auc(avgcuebyresponsetrace_df, timerange_cue, interval=(0, 2))
@@ -1394,7 +1514,9 @@ master_df = pd.merge(master_df, peak_flick_df[['Mouse', 'Session', 'Trial', 'Pea
 trial_bouts = avgflicktrace_df.groupby(['Mouse', 'Session', 'Trial'])['Licks'].max().reset_index()
 master_df = pd.merge(master_df, trial_bouts, on=['Mouse', 'Session', 'Trial'], how='left')
 master_df['Licks'] = master_df['Licks'].fillna(0) 
-
+master_df = master_df.sort_values(['Mouse','Session','Trial'])
+master_df['Cumulative_Licks'] = (master_df.groupby(['Mouse','Session'])['Licks'].cumsum())
+master_df['Prev_Licks'] = (master_df.groupby(['Mouse','Session'])['Licks'].shift(1))
 # 5. Add Timeout Presses (Amount of ITI timeout presses before this trial)
 timeout_counts = allititrace_df[['Mouse', 'Session', 'Trial', 'TimeoutLength']].copy()
 timeout_counts.rename(columns={'TimeoutLength': 'TimeoutCount'}, inplace=True)
@@ -1409,11 +1531,20 @@ print("QUESTION 1: PREDICTIVE POWER OVER SESSIONS (PEAK HEIGHTS)")
 print("="*60)
 
 
-# --- A. LIKELIHOOD TO LEVER PRESS (Logistic Regression) ---
+# --- LIKELIHOOD TO LEVER PRESS/ LICK BY CUE HEIGHT (Logistic Regression) ---
 if master_df['Pressed'].nunique() > 1: # Ensures there's a mix of Yes/No presses
     try:
-        logit_press = smf.logit("Pressed ~ Cue_Peak + TimeoutCount + Session", data=master_df).fit(disp=0)
+        logit_press = smf.logit("Pressed ~ Cue_Peak +Trial + Session", data=master_df).fit(disp=0)
         print("\n--- Likelihood to Lever Press ---")
+        print(logit_press.summary().tables[1])
+        print("-> If the P>|z| for Cue_Peak is < 0.05, it significantly predicts a lever press.")
+    except:
+        print("Logit failed. (Animals might press 100% of the time).")
+        
+if master_df['Licked'].nunique() > 1: # Ensures there's a mix of Yes/No presses
+    try:
+        logit_press = smf.logit("Licked ~ Cue_Peak +Trial + Session", data=master_df).fit(disp=0)
+        print("\n--- Likelihood to Lick ---")
         print(logit_press.summary().tables[1])
         print("-> If the P>|z| for Cue_Peak is < 0.05, it significantly predicts a lever press.")
     except:
@@ -1422,29 +1553,270 @@ if master_df['Pressed'].nunique() > 1: # Ensures there's a mix of Yes/No presses
 # --- B. LATENCY TO LEVER PRESS (Linear Mixed Model) ---
 df_lat = master_df[master_df['Pressed'] == 1].dropna(subset=['LeverLate', 'Cue_Peak'])
 if len(df_lat) > 0:
-    lmm_lat = smf.mixedlm("LeverLate ~ Cue_Peak + Session", df_lat, groups=df_lat["Mouse"]).fit()
+    lmm_lat = smf.mixedlm("LeverLate ~ Cue_Peak + Trial + Session", df_lat, groups=df_lat["Mouse"]).fit()
     print("\n--- Latency to Lever Press ---")
     print(lmm_lat.summary().tables[1])
     print("-> A negative coefficient (Coef.) for Cue_Peak means a higher fluorescence peak results in a FASTER press.")
 
+df_lat = master_df[master_df['Licked'] == 1].dropna(subset=['Licks', 'Cue_Peak'])
+if len(df_lat) > 0:
+    lmm_lat = smf.mixedlm("Licks ~ Cue_Peak + Trial + Session", df_lat, groups=df_lat["Mouse"]).fit()
+    print("\n--- Number of Licks ---")
+    print(lmm_lat.summary().tables[1])
+    print("-> A negative coefficient (Coef.) for Cue_Peak means a higher fluorescence peak results in a FASTER press.")
+    
+
+# --- B. LATENCY TO LEVER PRESS (Linear Mixed Model) ---
+df_lat = master_df[master_df['Pressed'] == 1].dropna(subset=['LeverLate', 'Lick_Peak'])
+if len(df_lat) > 0:
+    lmm_lat = smf.mixedlm("LeverLate ~ Lick_Peak + Trial + Session", df_lat, groups=df_lat["Mouse"]).fit()
+    print("\n--- Latency to Lever Press ---")
+    print(lmm_lat.summary().tables[1])
+    print("-> A negative coefficient (Coef.) for Cue_Peak means a higher fluorescence peak results in a FASTER press.")
+
+df_lat = master_df[master_df['Licked'] == 1].dropna(subset=['Licks', 'Lick_Peak'])
+if len(df_lat) > 0:
+    lmm_lat = smf.mixedlm("Licks ~ Lick_Peak + Trial + Session", df_lat, groups=df_lat["Mouse"]).fit()
+    print("\n--- Number of Licks ---")
+    print(lmm_lat.summary().tables[1])
+    print("-> A negative coefficient (Coef.) for Cue_Peak means a higher fluorescence peak results in a FASTER press.")
+    
+
 # --- C. PREDICTING LICK BOUT LENGTH (Model Comparison) ---
 # We compare the Cue, Lever, and Lick signals head-to-head using AIC
-df_bout = master_df[master_df['Licks'] > 0].dropna(subset=['Cue_Peak', 'Lever_Peak', 'Lick_Peak'])
-if len(df_bout) > 0:
-    mod_cue = smf.mixedlm("Licks ~ Cue_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
-    mod_lev = smf.mixedlm("Licks ~ Lever_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
-    mod_lick = smf.mixedlm("Licks ~ Lick_Peak + Session", df_bout, groups=df_bout["Mouse"]).fit()
 
-    print("\n--- Predicting Amount Drank (Bout Length) ---")
-    print(f"Cue Signal AIC:   {mod_cue.aic:.1f}")
-    print(f"Lever Signal AIC: {mod_lev.aic:.1f}")
-    print(f"Lick Signal AIC:  {mod_lick.aic:.1f}")
-    print("-> The model with the LOWEST AIC is the strongest predictor of how much the animal drinks.")
+df_bout = master_df[master_df['Licks'] > 0].dropna(subset=['Cue_Peak','Lever_Peak','Lick_Peak'])
+from sklearn.preprocessing import StandardScaler
+import statsmodels.formula.api as smf
+
+df_bout = master_df[master_df['Licks'] > 0].dropna(
+    subset=['Cue_Peak','Lever_Peak','Lick_Peak']
+)
+
+# scale predictors
+scaler = StandardScaler()
+df_bout[['Cue_Peak','Lever_Peak','Lick_Peak','Trial','Session']] = scaler.fit_transform(
+    df_bout[['Cue_Peak','Lever_Peak','Lick_Peak','Trial','Session']]
+)
+
+if len(df_bout) > 0:
+
+    # ---------------- BASELINE ----------------
+    baseline = smf.mixedlm(
+        "Licks ~ Trial + Session",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    # ---------------- NEURAL MODELS ----------------
+    mod_cue = smf.mixedlm(
+        "Licks ~ Trial + Session + Cue_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    mod_lev = smf.mixedlm(
+        "Licks ~ Trial + Session + Lever_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    mod_lick = smf.mixedlm(
+        "Licks ~ Trial + Session + Lick_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    # ---------------- AIC COMPARISON ----------------
+    print("\n--- Model Comparison: Predicting Bout Length ---")
+
+    print(f"Baseline AIC: {baseline.aic:.2f}")
+    print()
+
+    print(f"Cue Model AIC:   {mod_cue.aic:.2f}   ΔAIC = {mod_cue.aic - baseline.aic:.2f}")
+    print(f"Lever Model AIC: {mod_lev.aic:.2f}   ΔAIC = {mod_lev.aic - baseline.aic:.2f}")
+    print(f"Lick Model AIC:  {mod_lick.aic:.2f}   ΔAIC = {mod_lick.aic - baseline.aic:.2f}")
+
+print(mod_cue.summary())
+
+# --- C. PREDICTING LICK BOUT LENGTH OF NEXT TRIAL (Model Comparison) ---
+
+master_df = master_df.sort_values(['Mouse','Session','Trial'])
+
+master_df['Next_Licks'] = master_df.groupby(
+    ['Mouse','Session']
+)['Licks'].shift(-1)
+df_next = master_df.dropna(subset=['Next_Licks','Cue_Peak'])
+model_next = smf.mixedlm(
+    "Next_Licks ~ Cue_Peak + Trial + Session",
+    df_next,
+    groups=df_next["Mouse"]
+).fit(method="lbfgs", reml=False)
+
+print(model_next.summary())
+
+# model_next = smf.mixedlm(
+#     "Next_Licks ~ Cue_Peak + Trial + Session",
+#     df_next,
+#     groups=df_next["Mouse"]
+# ).fit(method="lbfgs", reml=False)
+
+# print(model_next.summary())
+
+
+
+# --- C. PREDICTING LICK BOUT LENGTH (Model Comparison) ---
+# We compare the Cue, Lever, and Lick signals head-to-head using AIC
+
+df_bout = master_df[master_df['LeverLate'] > 0].dropna(subset=['Cue_Peak','Lever_Peak','Lick_Peak'])
+from sklearn.preprocessing import StandardScaler
+import statsmodels.formula.api as smf
+
+df_bout = master_df[master_df['LeverLate'] > 0].dropna(
+    subset=['Cue_Peak','Lever_Peak','Lick_Peak']
+)
+
+# scale predictors
+scaler = StandardScaler()
+df_bout[['Cue_Peak','Lever_Peak','Lick_Peak','Trial','Session']] = scaler.fit_transform(
+    df_bout[['Cue_Peak','Lever_Peak','Lick_Peak','Trial','Session']]
+)
+
+if len(df_bout) > 0:
+
+    # ---------------- BASELINE ----------------
+    baseline = smf.mixedlm(
+        "LeverLate ~ Trial + Session",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    # ---------------- NEURAL MODELS ----------------
+    mod_cue = smf.mixedlm(
+        "LeverLate ~ Trial + Session + Cue_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    mod_lev = smf.mixedlm(
+        "LeverLate ~ Trial + Session + Lever_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    mod_lick = smf.mixedlm(
+        "LeverLate ~ Trial + Session + Lick_Peak",
+        df_bout,
+        groups=df_bout["Mouse"]
+    ).fit(method="lbfgs", maxiter=2000, reml=False)
+
+    # ---------------- AIC COMPARISON ----------------
+    print("\n--- Model Comparison: Predicting LeverLate ---")
+
+    print(f"Baseline AIC: {baseline.aic:.2f}")
+    print()
+
+    print(f"Cue Model AIC:   {mod_cue.aic:.2f}   ΔAIC = {mod_cue.aic - baseline.aic:.2f}")
+    print(f"Lever Model AIC: {mod_lev.aic:.2f}   ΔAIC = {mod_lev.aic - baseline.aic:.2f}")
+    print(f"Lick Model AIC:  {mod_lick.aic:.2f}   ΔAIC = {mod_lick.aic - baseline.aic:.2f}")
+
+print(mod_cue.summary())
+
+# --- C. PREDICTING LICK BOUT LENGTH OF NEXT TRIAL (Model Comparison) ---
+
+master_df = master_df.sort_values(['Mouse','Session','Trial'])
+
+master_df['Next_Latency'] = master_df.groupby(
+    ['Mouse','Session']
+)['LeverLate'].shift(-1)
+df_next = master_df.dropna(subset=['Next_Latency','Cue_Peak'])
+model_next = smf.mixedlm(
+    "Next_Latency ~ Cue_Peak + Trial + Session",
+    df_next,
+    groups=df_next["Mouse"]
+).fit(method="lbfgs", reml=False)
+
+print(model_next.summary())
+
+# ---------------------------
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# -----------------------------
+# Prepare data
+# -----------------------------
+data = pd.DataFrame([
+    # Sucrose
+    ['Sucrose','Bout Length','Cue Peakheight',-4.69,-0.652,True],
+    ['Sucrose','Bout Length','Lever Peakheight',-0.34,None,False],
+    ['Sucrose','Bout Length','Lick Peakheight',1.43,None,False],
+    ['Sucrose','Lever Latency','Cue Peakheight',-11.33,-0.652,True],
+    ['Sucrose','Lever Latency','Lever Peakheight',-10.19,None,False],
+    ['Sucrose','Lever Latency','Lick Peakheight',0.97,None,False],
+    # Alcohol
+    ['Alcohol','Bout Length','Cue Peakheight',-0.63,0.171,False],
+    ['Alcohol','Bout Length','Lever Peakheight',-0.08,None,False],
+    ['Alcohol','Bout Length','Lick Peakheight',1.89,None,False],
+    ['Alcohol','Lever Latency','Cue Peakheight',0.08,0.171,False],
+    ['Alcohol','Lever Latency','Lever Peakheight',-0.94,None,False],
+    ['Alcohol','Lever Latency','Lick Peakheight',-0.85,None,False],
+], columns=['Reinforcer','DV','Predictor','DeltaAIC','Coef','Significant'])
+
+# -----------------------------
+# Plot ΔAIC barplots
+# -----------------------------
+sns.set(style="whitegrid")
+fig, axes = plt.subplots(2, 2, figsize=(12,8), sharey=True)
+
+panels = [('Bout Length','Bout Length'), ('Lever Latency','Lever Latency')]
+reinforcers = ['Sucrose','Alcohol']
+
+for i, dv in enumerate(['Bout Length','Lever Latency']):
+    for j, reinf in enumerate(reinforcers):
+        ax = axes[i,j]
+        df_plot = data[(data['DV']==dv)&(data['Reinforcer']==reinf)]
+        sns.barplot(x='Predictor', y='DeltaAIC', data=df_plot, ax=ax, palette='Set2')
+        ax.axhline(0, color='black', linewidth=0.8)
+        ax.set_title(f"{reinf} — {dv}")
+        ax.set_ylabel('ΔAIC vs baseline')
+        ax.set_xlabel('Neural Predictor')
+        for k, row in df_plot.iterrows():
+            if row['Significant']:
+                ax.text(k%3, row['DeltaAIC']+0.2, '*', ha='center', va='bottom', fontsize=16, color='red')
+
+plt.tight_layout()
+plt.show()
+
+# -------------------
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+
+X = master_df[['Cue_Peak','Lever_Peak','Lick_Peak']]
+y = master_df['LeverLate']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+r2 = r2_score(y_test, y_pred)
+print("Cross-validated R²:", r2)
+importance = pd.Series(model.coef_, index=X.columns)
+print(importance)
+# -------------
 
 
 print("\n" + "="*60)
 print("QUESTION 2: DYNAMICS ON THE LAST DAY OF LEARNING (PEAK HEIGHTS)")
 print("="*60)
+
 
 max_session = master_df['Session'].max()
 df_last = master_df[master_df['Session'] == max_session].copy()
@@ -1458,6 +1830,24 @@ if len(df_corr) > 0:
     print("\nCorrelations with Lever Latency:")
     r, p = spearmanr(df_corr['Cue_Peak'], df_corr['LeverLate'])
     print(f"  Cue_Peak vs Lever Latency: r = {r:+.3f}, p = {p:.4f}")
+
+    print("\nCorrelations with Lick Bout Length (Amount Consumed):")
+    for sig in ['Cue_Peak', 'Lever_Peak', 'Lick_Peak']:
+        r, p = spearmanr(df_corr[sig], df_corr['Licks'])
+        print(f"  {sig} vs Bout Length: r = {r:+.3f}, p = {p:.4f}")
+
+max_session = master_df['Session'].max()
+df_last = master_df[master_df['Session'] == max_session].copy()
+print(f"Analyzing Final Session: {max_session}")
+
+# Filter for successful trials to correlate metrics
+df_corr = df_last[df_last['Pressed'] == 1].dropna(subset=['Cue_Peak', 'Lever_Peak', 'Lick_Peak', 'LeverLate', 'Licks'])
+
+if len(df_corr) > 0:
+    # 1. Spearman Correlations
+    print("\nCorrelations with Lever Latency:")
+    r, p = spearmanr(df_corr['Lick_Peak'], df_corr['LeverLate'])
+    print(f"  Lick_Peak vs Lever Latency: r = {r:+.3f}, p = {p:.4f}")
 
     print("\nCorrelations with Lick Bout Length (Amount Consumed):")
     for sig in ['Cue_Peak', 'Lever_Peak', 'Lick_Peak']:
