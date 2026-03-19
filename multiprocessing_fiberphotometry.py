@@ -48,7 +48,7 @@ experiment = 'D2_SuctoEtOH_SucExtinction2'
 
 # ------- D1 MEDIUM SPINY NEURONS -------
 mice = ['676', '679', '849', '873', '874', '917']
-# experiment = 'D1_EtOHLearning'
+experiment = 'D1_EtOHLearning'
 # experiment = 'D1_1WeekWD'
 male = ['676', '679', '849']
 female = ['873', '874', '917']
@@ -682,12 +682,13 @@ colors = sns.color_palette("husl", 10)
 colors10 = sns.color_palette("husl", 10)
 
 # ------------------------- PLOTTING HEATMAPS OF FULL TRIALS -------------------------
-cmapcolor = 'vlag' #sns.diverging_palette(250, 30, l=60, as_cmap=True)
+cmapcolor = sns.diverging_palette(250, 30, l=60, as_cmap=True) #'vlag' 
 
 # ---- INTERTRIAL INTERVALS SORTED BY LATENCY TO PRESS DURING TIME OUT ----
 session_list = [3,7]
+downsample_factor = 20  # try 2, 5, 10 depending on resolution vs speed
 
-fig, axs = plt.subplots(1, 2, figsize=(10, 8))
+fig, axs = plt.subplots(2,1, figsize=(10, 4))
 timerange_iti_new = [0,timerange_iti[1]-timerange_iti[0]]
 for ax_i, session in enumerate(session_list):
     
@@ -695,14 +696,18 @@ for ax_i, session in enumerate(session_list):
     
     sorted_session_df = session_df.sort_values("TimeoutLength")
     traces = np.vstack(sorted_session_df["Trace"].values)
+ 
+    # ---- DOWNSAMPLE HERE ----
+    traces = traces[:, ::downsample_factor]
+     
     n_trials, n_timepoints = traces.shape
     time = np.linspace(timerange_iti_new[0], timerange_iti_new[1], n_timepoints)
-
+    
     ax = axs[ax_i]
-    sns.heatmap(traces, cmap=cmapcolor, vmin=-4, vmax=4, cbar=True, ax=ax)
+    sns.heatmap(traces, cmap=cmapcolor, vmin=-3, vmax=3, cbar=True, ax=ax)
     ax.set_xticks(np.arange(0, len(time)+1, 2*len(time)/(timerange_iti_new[1]-timerange_iti_new[0])),
         np.arange(timerange_iti_new[0], timerange_iti_new[1]+1, 2, dtype=int))
-
+    
     # Convert each timeout time → heatmap x index
     def convert_list_to_xcoords(timeout_list):
         return [(t - timerange_iti_new[0]) / (timerange_iti_new[1] - timerange_iti_new[0]) * n_timepoints for t in timeout_list]
@@ -717,20 +722,26 @@ plt.savefig('/Users/kristineyoon/Documents/fullititraceheatmap_bylatency.pdf', t
 plt.show()
 
 # ---- ACTIVE TRIALS SORTED BY LATENCY TO LICK ----
-fig, axs = plt.subplots(1, 2, figsize=(10, 8))
+
+fig, axs = plt.subplots(2,1, figsize=(10, 4))
 
 for ax_i, session in enumerate(session_list):
     session_df = alltrialtrace_df.loc[alltrialtrace_df['Session'] == session]
     session_sorted_df = session_df.sort_values(by='Latency')
+    
     traces = np.vstack(session_sorted_df['Trace'])
-    latency_values = session_sorted_df['Latency'].values  # shape (n_trials,)
+    # ---- DOWNSAMPLE HERE ----
+    traces = traces[:, ::downsample_factor]
+     
     n_trials, n_timepoints = traces.shape
-
-    time = np.linspace(active_time[0], active_time[1], n_timepoints)
+    time = np.linspace(timerange_iti_new[0], timerange_iti_new[1], n_timepoints)
+    
+    latency_values = session_sorted_df['Latency'].values  # shape (n_trials,)
 
     # --- HEATMAP ---
-    sns.heatmap(traces, cmap=cmapcolor, vmin=-4, vmax=4, cbar=True, ax=axs[ax_i])
     ax = axs[ax_i]
+    sns.heatmap(traces, cmap=cmapcolor, vmin=-3, vmax=3, cbar=True, ax=ax)
+    
     ax.set_xticks(np.arange(0, n_timepoints + 1, 2 * n_timepoints / (active_time[1] - active_time[0])), np.arange(active_time[0], active_time[1] + 1, 2, dtype=int))
     ax.axvline(x=n_timepoints * (0 - active_time[0]) / (active_time[1] - active_time[0]),linewidth=1, color='black')
 
